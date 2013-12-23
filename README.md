@@ -1,5 +1,7 @@
 # Bong
 
+[![Build Status](https://travis-ci.org/weedlabs/bong.png?branch=master)](https://travis-ci.org/weedlabs/bong)
+
 Flask application scaffolding, modularized and 100% covered by unit
 and functional tests; ready for extreme programming.
 
