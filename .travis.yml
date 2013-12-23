@@ -1,0 +1,27 @@
+language: python
+
+python:
+  - "2.7"
+
+services:
+  - redis-server
+  - mysql
+
+env:
+  - BONG_TEST_TYPE=unit
+  - BONG_TEST_TYPE=functional
+
+cache:
+  apt: true
+  directories:
+    - $HOME/.curds
+
+install:
+  - pip install curdling
+  - curd install -r development.txt
+
+before_script:
+  - python manage.py db
+
+script:
+  - TESTING=true python manage.py $BONG_TEST_TYPE
