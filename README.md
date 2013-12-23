@@ -18,27 +18,32 @@ and functional tests; ready for extreme programming.
 
 ## Getting Started in 5 steps
 
-1. Fork the project
-2. Clone from your own copy
-3. Run the `install-wizard.sh` script, which will install the dependencies in your environment
-4. Run the tests to make sure everything went well
-5. Disco!
+ 1. Fork the project
+ 2. Clone from your own copy
+ 3. Run the `install-wizard.sh` script, which will install the dependencies in your environment
+ 4. Run the tests to make sure everything went well
+ 5. Disco!
 
 ## Bonus: Demo site
 
-1. Install [NPM](http://npmjs.org)
+ 1. Install [NPM](http://npmjs.org)
 
 ```bash
 npm install bower
+```
+
+ 2. Download and copy static files
+
+```bash
 make static
 ```
 
-2. Run the server
+ 3. Run the server
 
 ```bash
 make run
 ```
 
-3. Disco!
+ 4. Disco!
 
 ![screenshot.png](screenshot.png)
