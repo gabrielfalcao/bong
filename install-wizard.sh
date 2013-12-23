@@ -34,6 +34,7 @@ curd install -r development.txt
 
 ./rename-inline.sh Bong $ApplicationName
 mv bong `printf $ApplicationName | tr '[:upper:]' '[:lower:]'`
+git rm -f screenshot.png
 git add `printf $ApplicationName | tr '[:upper:]' '[:lower:]'`
 # Commit if still using git
 if [ -e ".git" ]; then

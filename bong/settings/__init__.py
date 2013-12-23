@@ -1,7 +1,7 @@
 # -*- coding: utf-8; mode: python -*-
 from milieu import Environment
 import sys
-import os
+
 env = Environment()
 
 SELF = sys.modules[__name__]
@@ -12,11 +12,12 @@ from os.path import join, abspath
 LOCAL_PORT = 8000
 PORT = env.get_int('PORT', LOCAL_PORT)
 
+STATIC_BASE_URL = '//static.bong.s3-website-us-east-1.amazonaws.com/s/'
 
 # Identifying environment
 LOCAL = PORT is LOCAL_PORT
 
-# setting up environment variables before all
+# setting up environment variables after all
 if LOCAL:
     print "using custom localhost-specific settings"
     from .local import setup_localhost
@@ -38,7 +39,7 @@ SQLALCHEMY_DATABASE_URI = env.get('SQLALCHEMY_DATABASE_URI')
 REDIS_URI = env.get_uri("REDIS_URI")
 
 # Filesystem
-LOCAL_FILE = lambda *path: abspath(join(__file__, '..', *path))
+LOCAL_FILE = lambda *path: abspath(join(__file__, '..', '..', *path))
 
 # Security
 SECRET_KEY = env.get("SESSION_SECRET_KEY")
@@ -50,7 +51,9 @@ LOGGER_NAMES = [
     'bong.api.resources',
     'bong.framework.http',
     'bong.framework.db',
+    'bong.web.models',
+    'bong.web.controllers',
 ]
 
 API_TOKEN_EXPIRATION_TIME = 60 * 60 * 12  # 12 hours in seconds
-SALT = '$2a$12$MGIxpQ5kk.ETWgzCkY2TCu'
+SALT = 'UXLcFCGwG_7tgC_6'

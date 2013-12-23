@@ -46,3 +46,17 @@ db:
 docs:
 	markment -t .theme spec
 	open "`pwd`/_public/index.html"
+
+static:
+	bower install
+	@mkdir -p bong/static/{js,css,fonts}
+
+	cp bower_components/angular/angular.min.js.map         bong/static/js
+	cp bower_components/angular/angular.min.js             bong/static/js
+	cp bower_components/jquery/jquery.min.js               bong/static/js
+	cp bower_components/jquery/jquery.min.map              bong/static/js
+	cp bower_components/bootstrap/dist/js/bootstrap.min.js bong/static/js
+
+	cp bower_components/bootstrap/dist/fonts/*             bong/static/fonts
+
+	cp bower_components/bootstrap/dist/css/*.min.css       bong/static/css

@@ -12,7 +12,13 @@ from bong.framework.core import Application
 this_file = Node(__file__)
 this_folder = this_file.parent
 
-application = Application.from_env(template_folder=this_folder.join('templates'))
+application = Application.from_env(
+    template_folder=this_folder.join('templates'),
+    static_folder=this_folder.join('static'),
+)
 
-# for module in modules:
-#     application.register_blueprint(module)
+application.enable_session()
+application.enable_assets()
+
+from .web.controllers import module
+application.register_blueprint(module)
