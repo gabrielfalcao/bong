@@ -1,5 +1,7 @@
 all: test
 
+export SQLALCHEMY_DATABASE_URI:=mysql://root@localhost/bong_db_local
+
 test: unit functional
 
 prepare:
@@ -28,24 +30,23 @@ check:
 	python manage.py check
 
 
-local-migrate-forward:
-	@[ "$(reset)" == "yes" ] && echo "drop database bong;create database bong" | mysql -uroot || echo "Running new migrations..."
+migrate-forward:
+	@[ "$(reset)" == "yes" ] && echo "drop database if exists bong_db_local;create database bong_db_local" | mysql -uroot || echo "Running new migrations..."
 	@alembic upgrade head
 
-migrate-forward:
-	echo "Running new migrations..."
-	@alembic -c alembic.prod.ini upgrade head
-
-local-migrate-back:
+migrate-back:
 	@alembic downgrade -1
 
 db:
-	@echo "drop database if exists bong ;create database bong" | mysql -uroot
+	echo "drop database if exists bong_db_local;create database bong_db_local" | mysql -uroot
 	python manage.py db
 
 docs:
 	markment -t .theme spec
 	open "`pwd`/_public/index.html"
+
+prod-simulation:
+       PYTHONPATH=`pwd` PORT="4000" DOMAIN="0.0.0.0" REDIS_URI="redis://localhost:6379" gunicorn --worker-class bong.upstream.WebsocketsSocketIOWorker bong.server:application
 
 static:
 	bower install

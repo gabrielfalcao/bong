@@ -9,13 +9,24 @@ SELF = sys.modules[__name__]
 from os.path import join, abspath
 
 
+##########
+# 3rd party stuff
+
+GOOGLE_ANALYTICS_CODE = 'UA-46592615-1'
+
+
+##########
+
+
 LOCAL_PORT = 8000
 PORT = env.get_int('PORT', LOCAL_PORT)
 
-STATIC_BASE_URL = '//static.bong.s3-website-us-east-1.amazonaws.com/s/'
+#STATIC_BASE_URL = '//static.bong.s3-website-us-east-1.amazonaws.com/s/'
+STATIC_BASE_URL = '/static/'
 
 # Identifying environment
 LOCAL = PORT is LOCAL_PORT
+SQLALCHEMY_DATABASE_URI = env.get('SQLALCHEMY_DATABASE_URI')
 
 # setting up environment variables after all
 if LOCAL:
@@ -35,7 +46,6 @@ DOMAIN = env.get("DOMAIN")
 SCHEME = PORT == 443 and 'https://' or "http://"
 
 # Database-related
-SQLALCHEMY_DATABASE_URI = env.get('SQLALCHEMY_DATABASE_URI')
 REDIS_URI = env.get_uri("REDIS_URI")
 
 # Filesystem
@@ -55,5 +65,10 @@ LOGGER_NAMES = [
     'bong.web.controllers',
 ]
 
-API_TOKEN_EXPIRATION_TIME = 60 * 60 * 12  # 12 hours in seconds
-SALT = 'UXLcFCGwG_7tgC_6'
+SALT = 'SGP#n>*3XJ)E9oubtmf"? bK'
+GEO_IP_FILE_LOCATION = LOCAL_FILE('data', 'GeoIPCity.dat')
+absurl = lambda *path: "{0}{1}/{2}".format(
+    SCHEME, DOMAIN, "/".join(path).lstrip('/'))
+
+sslabsurl = lambda *path: "{0}{1}/{2}".format(
+    "https://", DOMAIN, "/".join(path).lstrip('/'))

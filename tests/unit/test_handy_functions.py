@@ -6,7 +6,6 @@ from mock import patch
 from bong.framework.handy.functions import slugify, empty, now
 
 
-
 def test_slufify():
     ("slugify should turn everything inbto lower case and "
      "replace non-alphanumeric characters into dashes")
