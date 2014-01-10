@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright © 2013 Bong LLC
+# Copyright © 2013 Weedlabs Inc.
 #
 from __future__ import unicode_literals
 import __builtin__
@@ -315,10 +315,11 @@ class Model(object):
         conn = self.get_engine(input_engine).connect()
 
         mid = self.__data__.get('id', None)
-        if not mid:
+        if mid is None:
             res = conn.execute(
                 self.table.insert().values(**self.to_insert_params()))
-            self.__data__['id'] = res.lastrowid
+
+            self.__data__['id'] = res.inserted_primary_key[0]
             self.__data__.update(res.last_inserted_params())
         else:
             res = conn.execute(
