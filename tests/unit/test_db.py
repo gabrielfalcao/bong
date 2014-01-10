@@ -3,10 +3,9 @@
 # Copyright © 2013 Gabriel Falcão <gabriel@weedlabs.io>
 #
 
-import json
 import sqlalchemy as db
 from mock import patch, call, Mock
-from datetime import datetime, date, time
+from datetime import datetime, date
 from decimal import Decimal
 from bong.framework.db import (
     Model,
@@ -384,13 +383,12 @@ def test_model_save_new():
 
     result = db_mock.execute.return_value
 
-    # And that the result id is 333
-    result.lastrowid = 333
-
     # And the last inserted params of the result is an empty dict
     # TODO: better explanation?
     result.last_inserted_params.return_value = {}
 
+    # And that the result id is 333
+    result.inserted_primary_key = [333]
 
     d.save().should.equal(d)
 
@@ -412,7 +410,7 @@ def test_model_save_existing():
     result = db_mock.execute.return_value
 
     # And that the result id is 333
-    result.lastrowid = 333
+    result.inserted_primary_key = [333]
 
     # And the last inserted params of the result is an empty dict
     # TODO: better explanation?
@@ -653,7 +651,7 @@ def test_getattribute_from_model():
     manager = MyDummyUserManager()
 
     # And that the result id is 333
-    result.lastrowid = 333
+    result.inserted_primary_key = [333]
 
     # And the last inserted params of the result is an empty dict
     # TODO: better explanation?
@@ -690,7 +688,7 @@ def test_getattribute_from_model_with_falsy_value():
     result = connection_mock.execute.return_value
 
     # And that the result id is 333
-    result.lastrowid = 333
+    result.inserted_primary_key = [333]
 
     # And the last inserted params of the result is an empty dict
     # TODO: better explanation?
