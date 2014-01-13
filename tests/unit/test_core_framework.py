@@ -134,8 +134,6 @@ def test_application_enable_assets(Flask, AssetsManager):
     # Then the assets manager should have been instantiated
     app.assets.should.equal(AssetsManager.return_value)
 
-    # And `create_bundles` should have been called
-    app.assets.create_bundles.assert_called_once_with()
 
 
 
