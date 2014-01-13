@@ -67,8 +67,6 @@ class Application(object):
         http://elsdoerfer.name/docs/flask-assets/
         """
         self.assets = AssetsManager(self.flask_app)
-        # Loading our JS/CSS
-        self.assets.create_bundles()
 
     def enable_commands(self, commands):
         """Takes a list of 2-item tuples containing a command label
@@ -77,6 +75,9 @@ class Application(object):
         This command both sets up the commands structure and register
         the given commands.
         """
+        # Ensure local mode
+        os.environ.setdefault("BONG_LOCAL_MODE", "true")
+
         # preparing the command manager
         self.commands_manager = Manager(self.flask_app)
 

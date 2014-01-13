@@ -17,7 +17,6 @@ GOOGLE_ANALYTICS_CODE = 'UA-46592615-1'
 
 ##########
 
-
 LOCAL_PORT = 8000
 PORT = env.get_int('PORT', LOCAL_PORT)
 
@@ -25,7 +24,7 @@ PORT = env.get_int('PORT', LOCAL_PORT)
 STATIC_BASE_URL = '/static/'
 
 # Identifying environment
-LOCAL = PORT is LOCAL_PORT
+LOCAL = env.get('BONG_LOCAL_MODE') or (PORT is LOCAL_PORT)
 SQLALCHEMY_DATABASE_URI = env.get('SQLALCHEMY_DATABASE_URI')
 
 # setting up environment variables after all
@@ -47,6 +46,8 @@ SCHEME = PORT == 443 and 'https://' or "http://"
 
 # Database-related
 REDIS_URI = env.get_uri("REDIS_URI")
+
+
 
 # Filesystem
 LOCAL_FILE = lambda *path: abspath(join(__file__, '..', '..', *path))
@@ -72,3 +73,5 @@ absurl = lambda *path: "{0}{1}/{2}".format(
 
 sslabsurl = lambda *path: "{0}{1}/{2}".format(
     "https://", DOMAIN, "/".join(path).lstrip('/'))
+
+bong_path = abspath(join(__file__, '..', '..'))

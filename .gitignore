@@ -15,4 +15,5 @@ local-db.sqlite
 .*.#*
 docs/source_build/*
 _public/
-bower_components/
+bong/static/vendor
+bong/static/.webassets-cache

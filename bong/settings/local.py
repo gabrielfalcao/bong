@@ -26,7 +26,7 @@ DEFAULT_DB = 'mysql://root@localhost/bong'
 def setup_localhost(settings):
     # Relational Database
     os.environ.setdefault('SQLALCHEMY_DATABASE_URI', DEFAULT_DB)
-
+    settings.SQLALCHEMY_DATABASE_URI = DEFAULT_DB
 
     # REDIS
     # ~~~~~
