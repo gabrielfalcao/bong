@@ -34,15 +34,15 @@ curd install -r development.txt
 
 ./rename-inline.sh Bong $ApplicationName
 mv bong `printf $ApplicationName | tr '[:upper:]' '[:lower:]'`
-git rm -f screenshot.png
 git add `printf $ApplicationName | tr '[:upper:]' '[:lower:]'`
-# Commit if still using git
-if [ -e ".git" ]; then
-    git rm -f install-wizard.sh
-    git rm -f rename-inline.sh
 
-    git commit -am "Creating $ApplicationName with Bong <http://github.com/weedlabs/bong>"
-fi;
+rm -f screenshot.png
+rm -f install-wizard.sh
+rm -f rename-inline.sh
+git init
+git add .
+git commit -am "Creating $ApplicationName with Bong <http://github.com/weedlabs/bong>"
+
 
 printf "Cool, now try running \033[1;32mmake unit\033[0m or "
 printf "\033[1;32mmake functional\033[0m\n"
