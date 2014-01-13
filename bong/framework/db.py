@@ -11,11 +11,9 @@ import datetime
 from functools import partial
 from decimal import Decimal
 
-from flask import current_app
 from redis import StrictRedis
 from bong import settings
 from bong.framework.formats import json
-from flask.ext.sqlalchemy import SQLAlchemy
 import sqlalchemy as db
 from sqlalchemy import (
     create_engine,
