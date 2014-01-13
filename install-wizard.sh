@@ -39,6 +39,7 @@ git add `printf $ApplicationName | tr '[:upper:]' '[:lower:]'`
 rm -f screenshot.png
 rm -f install-wizard.sh
 rm -f rename-inline.sh
+rm -rf .git
 git init
 git add .
 git commit -am "Creating $ApplicationName with Bong <http://github.com/weedlabs/bong>"
