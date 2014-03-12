@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright © 2013 Gabriel Falcão <gabriel@weedlabs.io>
+
 #
 from __future__ import unicode_literals
 
@@ -16,7 +16,6 @@ import logging
 
 from flask.ext.script import Command
 from werkzeug.serving import run_simple
-from werkzeug.wsgi import DispatcherMiddleware
 
 
 class RunServer(Command):  # pragma: no cover
@@ -28,10 +27,11 @@ class RunServer(Command):  # pragma: no cover
         )
 
     def run(self):
-        run_simple('0.0.0.0', 8000,
-                   self.application,
-                   use_reloader=True,
-                   use_debugger=True,
+        run_simple(
+            '0.0.0.0', 5001,
+            self.application,
+            use_reloader=True,
+            use_debugger=True,
         )
 
 
@@ -47,6 +47,8 @@ class Shell(Command):  # pragma: no cover
         try:
             from IPython import embed
         except ImportError:
-            sys.stderr.write("You need to install \033[32mIPython\033[0m in order to use the bong shell\n")
+            msg = ("You need to install \033[32mIPython\033[0m in "
+                   "order to use the bong shell\n")
+            sys.stderr.write(msg)
 
         embed()

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright © 2013 Gabriel Falcão <gabriel@weedlabs.io>
-#
+
+# flake8: noqa
 from __future__ import unicode_literals
 import __builtin__
 
@@ -14,6 +14,7 @@ from decimal import Decimal
 from redis import StrictRedis
 from bong import settings
 from bong.framework.formats import json
+
 import sqlalchemy as db
 from sqlalchemy import (
     create_engine,
@@ -47,7 +48,7 @@ class ORM(type):
 
         cls.__columns__ = {c.name: c.type.python_type
                            for c in cls.table.columns}
-
+        setattr(ORM, name, cls)
         super(ORM, cls).__init__(name, bases, attrs)
 
 
@@ -58,7 +59,8 @@ class Manager(object):
         self.engine = engine
 
     def from_result_proxy(self, proxy, result):
-        """Creates a new instance of the model given a sqlalchemy result proxy"""
+        """Creates a new instance of the model given a sqlalchemy
+        result proxy"""
         if not result:
             return None
 
@@ -92,7 +94,8 @@ class Manager(object):
         for field, value in kw.items():
             query = query.where(getattr(self.model.table.c, field) == value)
 
-        proxy = conn.execute(query.order_by(db.desc(getattr(self.model.table.c, order_by or 'id'))))
+        proxy = conn.execute(query.order_by(db.desc(
+            getattr(self.model.table.c, order_by or 'id'))))
         return proxy
 
     def find_one_by(self, **kw):
@@ -131,7 +134,6 @@ class Model(object):
     find_one_by = classmethod(lambda cls, **kw: cls.using(engine).find_one_by(**kw))
     find_by = classmethod(lambda cls, **kw: cls.using(engine).find_by(**kw))
     all = classmethod(lambda cls: cls.using(engine).all())
-
 
     def __init__(self, engine=None, **data):
         '''A Model can be instantiated with keyword-arguments that
@@ -232,15 +234,15 @@ class Model(object):
 
         This method can be overwritten by subclasses at will.
         """
-        return self.to_dict_original()
+        return self.serialize()
 
-    def to_dict_original(self):
+    def serialize(self):
         """pre-serializes the model, returning a dictionary with
         key-values.
 
         This method is use by the to_dict() and only exists as a
         separate method so that subclasses overwriting `to_dict` can
-        call `to_dict_original()` rather than `super(SubclassName,
+        call `serialize()` rather than `super(SubclassName,
         self).to_dict()`
         """
 
@@ -248,7 +250,7 @@ class Model(object):
         return dict([(k, self.serialize_value(k, self.__data__.get(k))) for k in self.__columns__.keys()])
 
     def to_insert_params(self):
-        data = self.to_dict_original()
+        data = self.serialize()
 
         primary_key_names = [x.name for x in self.table.primary_key.columns]
         keys_to_pluck = filter(lambda x: x not in self.__columns__, data.keys()) + primary_key_names
@@ -325,6 +327,20 @@ class Model(object):
             self.__data__.update(res.last_updated_params())
 
         return self
+
+    def refresh(self):
+        new = self.find_one_by(id=self.id)
+        self.set(**new.__data__)
+        return self
+
+    def set(self, **kw):
+        """Sets multiple fields"""
+        cols = self.__columns__.keys()
+
+        for name, value in kw.items():
+            if name not in cols:
+                raise InvalidColumnName('{0}.{1}'.format(self, name))
+            setattr(self, name, value)
 
     def get(self, name, fallback=None):
         """Get a field value from the model"""

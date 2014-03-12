@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright © 2013 Gabriel Falcão <gabriel@weedlabs.io>
+
 #
 from __future__ import unicode_literals
 import logging
@@ -77,13 +77,13 @@ def test_application_must_be_callable(Flask):
     app = Application()
 
     # When I call it
-    result = app('some', arguments=True)
+    result = app('some', True)
 
     # Then the result must have come from the flask app
     result.should.equal(Flask.return_value.return_value)
 
     # And it should have been called with the given arguments
-    app.flask_app.assert_called_once_with('some', arguments=True)
+    app.flask_app.assert_called_once_with('some', True)
 
 
 @patch('bong.framework.core.RedisSessionInterface')
@@ -134,6 +134,8 @@ def test_application_enable_assets(Flask, AssetsManager):
     # Then the assets manager should have been instantiated
     app.assets.should.equal(AssetsManager.return_value)
 
+    # And `create_bundles` should have been called
+    app.assets.create_bundles.assert_called_once_with()
 
 
 
@@ -211,9 +213,11 @@ def test_application_run_cli_without_commands(Flask):
     call_to_run_cli = app.run_cli.when.called
 
     # Then it should have raised a descriptive RuntimeError
-    call_to_run_cli.should.throw(RuntimeError,
-                                 'The method run_cli can only be called '
-                                 'after the `enable_commands` method was called.')
+    call_to_run_cli.should.throw(
+        RuntimeError,
+        'The method run_cli can only be called '
+        'after the `enable_commands` method was called.'
+    )
 
 
 @patch('bong.framework.core.Flask')
@@ -254,7 +258,7 @@ def test_setup_handler_for_logger(Flask, log):
     handler = log.get_pretty_log_handler.return_value
 
     # And the handler should have been added to the logger
-    logger.addHandler.assert_called_once_with(handler)
+    logger.handlers.should.equal([handler])
 
     # And the level of the logger should be set to the given logging level
     logger.setLevel.assert_called_once_with(logging.INFO)
@@ -280,13 +284,19 @@ def test_setup_logging_does_nothing_in_test_mode(Flask):
 def test_setup_logging(Flask, log):
     ("Application.setup_logging sets up")
 
-    # Background: log.get_logger will return the given name
-    log.get_logger.side_effect = lambda x: 'handler for [{0}]'.format(x)
+    logger1 = Mock(name='logger1')
+    logger2 = Mock(name='logger2')
+
+    log.DEFAULT_LOGGERS = [
+        logger1,
+        logger2,
+    ]
 
     # Given an application not in testing mode that mocks the
     # setup_handler_for_logger method
     class MyApplication(Application):
-        setup_handler_for_logger = Mock(name='MyApplication.setup_handler_for_logger')
+        setup_handler_for_logger = Mock(
+            name='MyApplication.setup_handler_for_logger')
 
     app = MyApplication()
     app.testing_mode = False
@@ -295,25 +305,13 @@ def test_setup_logging(Flask, log):
     output = Mock(name='FakeFileObject')
 
     # When I setup logging
-    loggers = app.setup_logging(output, logging.WARNING)
+    app.setup_logging(output, logging.WARNING)
 
-    # Then a logger should have been retrieved for each name in the settings file
-    log.get_logger.assert_has_calls([
-        call('bong'),
-        call('bong.api.models'),
-        call('bong.api.resources'),
-        call('bong.framework.http'),
-        call('bong.framework.db'),
-    ])
-
-    # And setup_handler_for_logger should have been called for each handler
+    # Then setup_handler_for_logger should have been called for each handler
     app.setup_handler_for_logger.assert_has_calls([
-        call('handler for [bong]', output, logging.WARNING),
-        call('handler for [bong.api.models]', output, logging.WARNING),
-        call('handler for [bong.api.resources]', output, logging.WARNING),
-        call('handler for [bong.framework.http]', output, logging.WARNING),
-        call('handler for [bong.framework.db]', output, logging.WARNING),
-
+        call(app.flask_app.logger, output, logging.WARNING),
+        call(logger1, output, logging.WARNING),
+        call(logger2, output, logging.WARNING),
    ])
 
 

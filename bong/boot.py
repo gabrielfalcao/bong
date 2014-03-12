@@ -30,7 +30,6 @@ from bong.framework.commands.db import (
 # Importing testing commands
 from bong.framework.commands.testing import (
     RunTest,
-    RunAcceptanceTests,
 )
 
 # Registering user commands
@@ -38,7 +37,6 @@ application.enable_commands([
     # Testing-related commands
     ('unit', RunTest('unit')),
     ('functional', RunTest('functional')),
-    ('acceptance', RunAcceptanceTests()),
 
     # Testing-related commands
     ('run', RunServer(application)),

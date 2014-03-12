@@ -1,14 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright © 2013 Gabriel Falcão <gabriel@weedlabs.io>
+
 #
 from __future__ import unicode_literals
 
+import traceback
 from flask import Response, request, current_app
-from flask.ext.restful import Api
+from flask.ext.restful import Api as BaseApi
 from flask.ext.restful import Resource
 from bong import settings
+from bong.framework.log import get_logger
 from bong.framework.formats import json
+
+logger = get_logger()
 
 
 def absolute_url(path, scheme=None):
@@ -47,9 +51,15 @@ def set_cors_into_headers(headers, allow_origin, allow_credentials=True, max_age
     >>> set_cors_into_headers(headers, allow_origin='*')
     """
     headers['Access-Control-Allow-Origin'] = allow_origin
-    headers['Access-Control-Allow-Headers'] = request.headers.get('Access-Control-Request-Headers', '*')
-    headers['Access-Control-Allow-Methods'] = request.headers.get('Access-Control-Request-Method', '*')
-    headers['Access-Control-Allow-Credentials'] = allow_credentials and 'true' or 'false'
+    headers['Access-Control-Allow-Headers'] = request.headers.get(
+        'Access-Control-Request-Headers', '*')
+
+    headers['Access-Control-Allow-Methods'] = request.headers.get(
+        'Access-Control-Request-Method', '*')
+
+    headers['Access-Control-Allow-Credentials'] = (
+        allow_credentials and 'true' or 'false')
+
     headers['Access-Control-Max-Age'] = max_age
 
 
@@ -73,12 +83,15 @@ class JSONException(Exception):
     status_code = 400
 
     def as_dict(self):
+
         return {
             'error': str(self)
         }
 
     def as_response(self):
-        return json_response(self.as_dict(), self.status_code)
+        resp = json_response(self.as_dict(), self.status_code)
+        set_cors_into_headers(resp.headers, allow_origin='*')
+        return resp
 
 
 class JSONNotFound(JSONException):
@@ -87,6 +100,7 @@ class JSONNotFound(JSONException):
 
 class JSONResource(Resource):
     representations = {
+        'multipart/form-data': json_representation,
         'application/json': json_representation,
         'text/json': json_representation,
     }
@@ -94,5 +108,31 @@ class JSONResource(Resource):
     def options(self, *args, **kw):
         resp = current_app.make_default_options_response()
         resp.headers['Content-Type'] = 'application/json'
+        set_cors_into_headers(resp.headers, allow_origin='*')
+        return resp
+
+
+class Api(BaseApi):
+    def log_error(self, e):
+        msg = ("An error happened upon "
+               "\033[1;33m{0}"" \033[1;36m`{1}`\033[0m:\n\n"
+               "<bong-error>%s\n</bong-error>".format(
+                   request.method,
+                   request.url))
+
+        logger.error(msg, traceback.format_exc(e))
+
+    def handle_error(self, e):
+        if isinstance(e, JSONException):
+            return e.as_response()
+
+        self.log_error(e)
+        meta = {
+            'error': 'internal server error',
+        }
+        if settings.TESTING:  # pragma: no cover
+            meta['traceback'] = traceback.format_exc(e)
+
+        resp = json_response(meta, 500)
         set_cors_into_headers(resp.headers, allow_origin='*')
         return resp

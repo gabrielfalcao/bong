@@ -1,0 +1,81 @@
+<div class="row">
+  <div ng-if="selectedDeal">
+    <div class="col-md-12 col-xs-12">
+      <div class="panel panel-success">
+        <div class="panel-heading">
+          <h3>Subscriptions for {{ selectedDeal.title }}</h3>
+        </div>
+        <div class="panel-body table-responsive">
+          <table class="table table-striped table-hover ">
+            <tbody>
+              <tr>
+                <th>Name</th>
+                <th>Desired</th>
+                <th>Minimum</th>
+                <th></th>
+              </tr>
+              <tr ng-repeat="sub in subscriptions">
+                <td>{{ sub.personal_info.first_name }}</td>
+                <td>{{ sub.desired_amount }}</td>
+                <td>{{ sub.minimum_amount }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-xs-12" ng-if="detailedUserInfo.error" ng-show="detailedUserInfo.error">
+      <div class="panel panel-danger">
+        <div class="panel-heading">
+          <h3 class="panel-title">Error</h3>
+        </div>
+        <div class="panel-body">
+          <strong>{{ detailedUserInfo.error }}</strong>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-xs-12" ng-if="detailedUserInfo.personal_info" ng-hide="detailedUserInfo.error">
+      <div class="panel panel-success">
+        <div class="panel-heading">
+          <h3 class="panel-title">{{ detailedUserInfo.user.email }}</h3>
+        </div>
+        <div class="panel-body">
+          <h4>{{ detailedUserInfo.personal_info.first_name }} {{ detailedUserInfo.personal_info.last_name }}</h4>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-12 col-xs-12">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+        <h3 class="panel-title">Pick a deal</h3>
+      </div>
+      <div class="panel-body" class="table-responsive">
+        <table class="table table-striped table-hover">
+          <tbody>
+            <tr>
+              <th>Title</th>
+              <th>Subscribers</th>
+            </tr>
+            <tr ng-repeat="deal in current_deals">
+              <td>{{ deal.title }}
+                <span class="label label-info">current</span>
+              </td>
+              <td>
+                <a class="btn btn-small btn-info" ng-click="ShowUsers(deal)">{{ deal.total_subscriptions }} total</a>
+              </td>
+            </tr>
+            <tr ng-repeat="deal in pending_deals">
+              <td>{{ deal.title }}
+        <span class="label label-warning">pending</span>
+</td>
+              <td>
+                <a class="btn btn-small btn-warning" ng-click="ShowUsers(deal)">{{ deal.total_subscriptions }} total</a>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

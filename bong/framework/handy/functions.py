@@ -4,7 +4,7 @@
 from __future__ import unicode_literals
 
 import re
-import math
+
 import unicodedata
 from datetime import datetime
 
@@ -48,7 +48,7 @@ EMPTYGEO = {
 }
 
 
-def geo_data_for_ip(ip_address):
+def geo_data_for_ip(ip_address):  # pragma: no cover
     geoip = PyGEOIP(settings.GEO_IP_FILE_LOCATION)
     try:
         return geoip.record_by_addr(ip_address) or EMPTYGEO
@@ -57,10 +57,19 @@ def geo_data_for_ip(ip_address):
         return EMPTYGEO
 
 
-def get_ip():
-    if request.headers.getlist("X-Real-IP"):
-        return request.headers.get("X-Real-IP")
-    elif request.headers.getlist("X-Forwarded-For"):
-        return request.headers.getlist("X-Forwarded-For")[0]
+def get_ip():  # pragma: no cover
+    try:
+        if request.headers.getlist("X-Real-IP"):
+            ip = request.headers.get("X-Real-IP")
+            logger.debug("Retrieved IP %s from header X-Real-IP", ip)
+        elif not request.headers.getlist("X-Forwarded-For"):
+            ip = request.remote_addr
+            logger.debug("Retrieved IP %s from request.remote_addr", ip)
+        else:
+            ip = request.headers.getlist("X-Forwarded-For")[0]
+            logger.debug("Retrieved IP %s from header X-Forwarded-For", ip)
 
-    return request.remote_addr
+        return ip
+    except:  # pragma: no cover
+        logger.exception("Error retrieving ip address")
+        return request.remote_addr

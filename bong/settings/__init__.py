@@ -21,7 +21,7 @@ LOCAL_PORT = 8000
 PORT = env.get_int('PORT', LOCAL_PORT)
 
 #STATIC_BASE_URL = '//static.bong.s3-website-us-east-1.amazonaws.com/s/'
-STATIC_BASE_URL = '/static/'
+STATIC_BASE_URL = '/static/build/'
 
 # Identifying environment
 LOCAL = env.get('BONG_LOCAL_MODE') or (PORT is LOCAL_PORT)
@@ -46,7 +46,6 @@ SCHEME = PORT == 443 and 'https://' or "http://"
 
 # Database-related
 REDIS_URI = env.get_uri("REDIS_URI")
-
 
 
 # Filesystem
@@ -75,3 +74,4 @@ sslabsurl = lambda *path: "{0}{1}/{2}".format(
     "https://", DOMAIN, "/".join(path).lstrip('/'))
 
 bong_path = abspath(join(__file__, '..', '..'))
+FONT_AWESOME_PATH = '//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/'

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright © 2013 Gabriel Falcão <gabriel@weedlabs.io>
+
 #
 from __future__ import unicode_literals
 import pickle
@@ -28,7 +28,7 @@ class RedisSessionInterface(SessionInterface):  # pragma: no cover
     serializer = pickle
     session_class = RedisSession
 
-    def __init__(self, prefix='bong:http:sessid',  redis=None):
+    def __init__(self, prefix='bong:http:sessid', redis=None):
         if redis is None:
             redis = get_redis_connection(db=2)
 

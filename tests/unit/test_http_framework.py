@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright © 2013 Gabriel Falcão <gabriel@weedlabs.io>
+
 #
 from __future__ import unicode_literals
-from mock import patch
+from mock import patch, Mock
 from bong.framework.http import (
     absolute_url,
     ssl_absolute_url,
@@ -11,7 +11,8 @@ from bong.framework.http import (
     json_representation,
     json_response,
     JSONResource,
-    JSONException
+    JSONException,
+    Api,
 )
 
 
@@ -119,14 +120,15 @@ def test_json_representation(json_response, set_cors_into_headers):
     json_response.assert_called_once_with(data, 200, headers)
 
     # And set_cors_into_headers was called with origin '*'
-    set_cors_into_headers.assert_called_once_with({'header1': 'from-request'}, allow_origin='*')
-
+    set_cors_into_headers.assert_called_once_with({
+        'header1': 'from-request'}, allow_origin='*')
 
 
 @patch('bong.framework.http.current_app')
 @patch('bong.framework.http.set_cors_into_headers')
 def test_json_resource_has_options_method(set_cors_into_headers, current_app):
-    ("JSONResource should have the method `options` implemented by default and enabling cors")
+    ("JSONResource should have the method `options` "
+     "implemented by default and enabling cors")
 
     # Given an instance of resource
     rsrc = JSONResource()
@@ -135,17 +137,22 @@ def test_json_resource_has_options_method(set_cors_into_headers, current_app):
     response = rsrc.options()
 
     # Then it should be the default options response
-    response.should.equal(current_app.make_default_options_response.return_value)
+    response.should.equal(
+        current_app.make_default_options_response.return_value)
 
-    # And set_cors_into_headers should have been called on the response headers
-    set_cors_into_headers.assert_called_once_with(response.headers, allow_origin='*')
+    # And set_cors_into_headers should have been called on the
+    # response headers
+    set_cors_into_headers.assert_called_once_with(
+        response.headers, allow_origin='*')
 
 
+@patch('bong.framework.http.set_cors_into_headers')
 @patch('bong.framework.http.Response')
 @patch('bong.framework.http.json')
-def test_json_response(json, Response):
+def test_json_response(json, Response, set_cors_into_headers):
     ("json_response should take raw python data to be serialized, "
-     "status code and headers and return a CORS-ready json-serialized response")
+     "status code and headers and return a CORS-ready "
+     "json-serialized response")
 
     # Given some data to be serialized
     data = {
@@ -170,6 +177,7 @@ def test_json_response(json, Response):
         headers={
             'header1': 'from-request',
             'Content-Type': 'application/json',
+            #'Cache-Control': u'Cache-Control:public, max-age=1200',
         }
     )
 
@@ -177,7 +185,7 @@ def test_json_response(json, Response):
     json.dumps.assert_called_once_with({'foo': 'bar'}, indent=2)
 
 
-def test_json_exception():
+def test_json_exception_as_dict():
     ("JSONException#as_dict should return the error under the `error` key")
 
     # Given an exception
@@ -190,8 +198,9 @@ def test_json_exception():
     data.should.have.key("error").being.equal("BOOM")
 
 
+@patch('bong.framework.http.set_cors_into_headers')
 @patch('bong.framework.http.json_response')
-def test_json_exception(json_response):
+def test_json_exception_as_response(json_response, set_cors_into_headers):
     ("JSONException#as_response should return a json response")
 
     # Given an exception
@@ -207,3 +216,54 @@ def test_json_exception(json_response):
     json_response.assert_called_once_with({
         'error': 'BOOM'
     }, 400)
+
+    # And set_cors_into_headers was called appropriately
+    set_cors_into_headers.assert_called_once_with(
+        json_response.return_value.headers, allow_origin='*')
+
+
+@patch('bong.framework.http.request')
+@patch('bong.framework.http.traceback')
+@patch('bong.framework.http.logger')
+def test_api_handle_error_json_exception(
+        logger, traceback, request):
+    ("Api#handle_error should return the exception "
+     "as response if it's a json exception")
+
+    class MyCoolError(JSONException):
+        def as_response(self):
+            return 'SWEEEEEET!!!'
+
+    module = Mock(name='Blueprint(api.resources)')
+
+    api = Api(module)
+
+    err = MyCoolError("SWEEEEEET!!!")
+
+    result = api.handle_error(err)
+    result.should.equal(err.as_response())
+
+
+@patch('bong.framework.http.request')
+@patch('bong.framework.http.traceback')
+@patch('bong.framework.http.json_response')
+@patch('bong.framework.http.set_cors_into_headers')
+@patch('bong.framework.http.logger')
+def test_api_handle_error_any_exception(
+        logger, set_cors_into_headers, json_response, traceback, request):
+    ("Api#handle_error should return the exception "
+     "as response if it's a json exception")
+
+    response = json_response.return_value
+
+    module = Mock(name='Blueprint(api.resources)')
+
+    api = Api(module)
+
+    err = ValueError("BOOM")
+
+    result = api.handle_error(err)
+    result.should.equal(response)
+
+    set_cors_into_headers.assert_called_once_with(
+        response.headers, allow_origin='*')

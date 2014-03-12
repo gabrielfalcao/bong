@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# <Copyright 2013 - Gabriel Falcão <gabriel@weedlabs.io>>
+# <Copyright 2013 - Bong LLC>
 
 from __future__ import unicode_literals
 
 # python stuff
 import os
-import sys
 
 # 3rd party stuff
 from flask import Flask, render_template
@@ -53,10 +52,10 @@ class Application(object):
         handler = self.flask_app.errorhandler(status_code)
         return handler(callback)
 
-    def __call__(self, *args, **kw):
+    def __call__(self, environ, start_response):
         """Making this class behave like a WSGI app, forwarding the
         call to flask"""
-        return self.flask_app(*args, **kw)
+        return self.flask_app(environ, start_response)
 
     def enable_session(self, session_interface=None):
         """Uses redis as session interface"""
@@ -67,6 +66,8 @@ class Application(object):
         http://elsdoerfer.name/docs/flask-assets/
         """
         self.assets = AssetsManager(self.flask_app)
+        # Loading our JS/CSS
+        self.assets.create_bundles()
 
     def enable_commands(self, commands):
         """Takes a list of 2-item tuples containing a command label
@@ -75,9 +76,6 @@ class Application(object):
         This command both sets up the commands structure and register
         the given commands.
         """
-        # Ensure local mode
-        os.environ.setdefault("BONG_LOCAL_MODE", "true")
-
         # preparing the command manager
         self.commands_manager = Manager(self.flask_app)
 
@@ -114,16 +112,15 @@ class Application(object):
             # don't register loggers if in testing_mode
             return
 
-        loggers = [self.flask_app.logger]
-        for name in settings.LOGGER_NAMES:
-            logger = log.get_logger(name)
-            self.setup_handler_for_logger(logger, output, level)
+        self.setup_handler_for_logger(
+            self.flask_app.logger, output, level)
 
-        return loggers
+        for logger in log.DEFAULT_LOGGERS:
+            self.setup_handler_for_logger(logger, output, level)
 
     def setup_handler_for_logger(self, logger, output, level):
         handler = log.get_pretty_log_handler(output)
-        logger.addHandler(handler)
+        logger.handlers = [handler]
         logger.setLevel(level)
         return logger
 
@@ -132,8 +129,7 @@ class Application(object):
                  environment_variable_name='BONG_SETTINGS_MODULE',
                  fallback_module_name='bong.settings',
                  *flask_args,
-                 **flask_kwargs
-        ):
+                 **flask_kwargs):
         """Returns an instance of `Application` fed with settings from
         the env + centralizes all the plugins and blueprint setup.
 
@@ -152,7 +148,8 @@ class Application(object):
         # Creating the application, now we can enable portions of the
         # flask_app separately, abstracted in methods to organize the
         # code and make it 100% testable.
-        application = CreateApplication(settings_module, *flask_args, **flask_kwargs)
+        application = CreateApplication(
+            settings_module, *flask_args, **flask_kwargs)
 
         # HTTP Error handling: making sure the app will render nice
         # 403, 404, 500... pages
@@ -166,5 +163,6 @@ class ErrorHandlers(object):
         self.flask_app = flask_app
 
     def internal_error(self, exception):
-        self.flask_app.logger.exception("The Flask application suffered an internal error")
+        self.flask_app.logger.exception(
+            "The Flask application suffered an internal error")
         return render_template('500.html', exception=exception), 500
