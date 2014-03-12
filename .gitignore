@@ -17,3 +17,6 @@ docs/source_build/*
 _public/
 bong/static/vendor
 bong/static/.webassets-cache
+bong/static/assets.manifest
+bong/static/build/
+makedb.log
