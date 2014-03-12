@@ -79,7 +79,7 @@ class RedisSessionInterface(SessionInterface):  # pragma: no cover
         value = self.serializer.dumps(dict(session))
 
         key = self.make_key(session_id)
-        expiration = int(redis_exp.total_seconds())
+        expiration = int(redis_expiration.total_seconds())
         self.redis.setex(key, expiration, value)
 
         response.set_cookie(cookie_name, session_id,
