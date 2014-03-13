@@ -431,3 +431,21 @@ def test_model_equality_no_id():
 
     instance.should_not.equal(other_instance)
     instance.should.equal(third_instance)
+
+
+@specification
+def test_model_refresh(context):
+    "Models can be refreshed"
+
+    data = {
+        "username": "octocat",
+        "gravatar_id": "somehexcode",
+        "email": "octocat@github.com",
+        "github_token": 'toktok',
+        "github_id": '123',
+    }
+    instance = User.create(**data)
+    instance.username = 'foo'
+    instance.username.should.equal('foo')
+    instance.refresh()
+    instance.username.should.equal('octocat')
