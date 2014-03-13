@@ -4,6 +4,9 @@ angular.module("BongApp.Common", [
         restrict: 'E',
         templateUrl: "{{ angular_template('navbar.html') }}",
         link: function (scope, element, attrs) {
+            scope.login = function(){
+                $state.go('login');
+            };
             scope.logout = function(){
                 localStorageService.clearAll();
                 $rootScope.bongAuthToken = null;
@@ -11,4 +14,4 @@ angular.module("BongApp.Common", [
             };
         }
     }
-})
+});

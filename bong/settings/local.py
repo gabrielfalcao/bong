@@ -39,4 +39,4 @@ def setup_localhost(settings):
 
     os.environ.setdefault('REDIS_URI', 'redis://localhost:6379')
     os.environ.setdefault('SESSION_SECRET_KEY', uuid.uuid4().hex)
-    settings.STATIC_BASE_URL = '/static/'
+    settings.STATIC_BASE_URL = '/static/build/'

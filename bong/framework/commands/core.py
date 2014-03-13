@@ -28,7 +28,7 @@ class RunServer(Command):  # pragma: no cover
 
     def run(self):
         run_simple(
-            '0.0.0.0', 5001,
+            '0.0.0.0', 8000,
             self.application,
             use_reloader=True,
             use_debugger=True,

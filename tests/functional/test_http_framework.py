@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+# Copyright © 2013 Gabriel Falcão <gabriel@weedlabs.io>
 #
 from __future__ import unicode_literals
-import json
 from mock import patch
 from bong import settings
-from bong.api.resources import api
-
-
 from bong.framework.http import (
     absolute_url,
     ssl_absolute_url,
@@ -17,18 +13,6 @@ from bong.framework.http import (
     JSONResource,
     JSONException,
 )
-
-
-@patch('bong.framework.http.request')
-def test_api_handle_error_non_json(request):
-    ("Api#handle_error should return 500")
-
-    response = api.handle_error(ValueError("boom"))
-    response.status_code.should.equal(500)
-
-    data = json.loads(response.data)
-
-    data.should.have.key("error").being.equal("internal server error")
 
 
 def test_absolute_url():
@@ -155,15 +139,24 @@ def test_json_resource_has_options_method(current_app, request):
 
 
 @patch('bong.framework.http.set_cors_into_headers')
-def test_json_exception_as_response(set_cors_into_headers):
-    ("JSONException should be able to represent itself as a Response")
+@patch('bong.framework.http.json_response')
+def test_json_exception_as_response(json_response, set_cors_into_headers):
+    ("JSONException#as_response should return a json response")
 
+    # Given an exception
     exc = JSONException("BOOM")
-    response = exc.as_response()
 
-    response.status_code.should.equal(400)
-    response.headers.should.have.key('Content-Type').being.equal('application/json')
-    response.data.should.equal('{\n  "error": "BOOM"\n}')
+    # When I turn that into a response
+    data = exc.as_response()
 
+    # Then it should be a response
+    data.should.equal(json_response.return_value)
+
+    # And json_response was called appropriately
+    json_response.assert_called_once_with({
+        'error': 'BOOM'
+    }, 400)
+
+    # And set_cors_into_headers was called appropriately
     set_cors_into_headers.assert_called_once_with(
-        response.headers, allow_origin='*')
+        json_response.return_value.headers, allow_origin='*')

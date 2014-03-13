@@ -20,8 +20,7 @@ GOOGLE_ANALYTICS_CODE = 'UA-46592615-1'
 LOCAL_PORT = 8000
 PORT = env.get_int('PORT', LOCAL_PORT)
 
-#STATIC_BASE_URL = '//static.bong.s3-website-us-east-1.amazonaws.com/s/'
-STATIC_BASE_URL = '/static/build/'
+STATIC_BASE_URL = '//static.bong.s3-website-us-east-1.amazonaws.com/s/'
 
 # Identifying environment
 LOCAL = env.get('BONG_LOCAL_MODE') or (PORT is LOCAL_PORT)

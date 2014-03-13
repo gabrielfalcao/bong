@@ -4,32 +4,20 @@
   <br />
   <br />
   <div class="col-lg-4 col-md-offset-4 col-xs-12">
-    <div class="alert alert-danger" ng-show="errors.role">
-      <h1>{{ errors.role }}</h1>
-    </div>
-
-    <div class="alert alert-info" ng-hide="errors.role">
+    <div class="alert alert-success">
     <h1>Bong</h1>
       <form class="bs-example form-horizontal" ng-submit="authenticate()" >
         <fieldset>
           <legend>Please authenticate</legend>
           <div class="form-group">
-            <label for="inputEmail" class="col-lg-3 control-label">Email</label>
+            <label for="inputToken" class="col-lg-3 control-label">Authentication Token</label>
             <div class="col-lg-9">
-              <input type="text" class="form-control" ng-model="login.email" placeholder="your username@bong.com">
-              <strong class="label label-danger" ng-if="errors.email">{{ errors.email[0] }}</strong>
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="inputPassword" class="col-lg-3 control-label">Password</label>
-            <div class="col-lg-9">
-              <input type="password" class="form-control" ng-model="login.password" placeholder="">
-              <strong class="label label-danger" ng-if="errors.password">{{ errors.password[0] }}</strong>
+              <input type="text" class="form-control" ng-model="token" placeholder="i.e: e2a0214c24f9aad3a4c56622b73c53bd60b89e9e">
             </div>
           </div>
           <div class="form-group">
             <div class="col-lg-10 col-lg-offset-2">
-              <button type="submit" class="btn btn-info">login</button>
+              <button ng-click="authenticate()" class="btn btn-danger">login</button>
             </div>
           </div>
         </fieldset>

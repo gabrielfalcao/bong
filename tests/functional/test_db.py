@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import httpretty
+
+from mock import Mock
 from .base import specification, User
-from datetime import datetime, date, time
+from datetime import datetime, date
 from decimal import Decimal
 from bong.framework.db import (
     Model, db, MetaData,
@@ -10,7 +11,6 @@ from bong.framework.db import (
     InvalidColumnName,
     EngineNotSpecified,
     MultipleEnginesSpecified,
-    get_redis_connection,
 )
 
 metadata = MetaData()
@@ -318,7 +318,7 @@ def test_model_deserialize_value():
     j = DatetimeSensitiveModel()
 
     # When I deserialize a value for that field
-    value = j.deserialize_value('a_date_field', '2010-10-10T00:00:00')
+    value = j.deserialize_value('a_date_field', '2010-10-10 00:00:00')
 
     # Then it should be a real datetime
     value.should.be.a(datetime)
@@ -340,7 +340,7 @@ def test_model_deserialize_value():
     j = DateSensitiveModel()
 
     # When I deserialize a value for that field
-    value = j.deserialize_value('a_date_field', '2010-10-10T00:00:00')
+    value = j.deserialize_value('a_date_field', '2010-10-10 00:00:00')
 
     # Then it should be a real date
     value.should.be.a(date)
@@ -374,6 +374,39 @@ def test_model_get():
     instance.get('name').should.equal('Jeez')
     instance.get('age').should.be.none
     instance.get('age', 123).should.equal(123)
+
+
+def test_model_set():
+    ("Model#set can set many keyword arguments at "
+     "once for a sinle model instance")
+
+    instance = DummyUserModel(name='Dummy One', age=20)
+    instance.save = Mock()
+    instance.set(
+        name="Another Two",
+        age=40,
+    )
+
+    instance.name.should.equal("Another Two")
+    instance.age.should.equal(40)
+
+    instance.save.called.should.be.false
+
+
+def test_model_set_invalid_col():
+    ("Model#set raises InvalidColumnName if an invalid "
+     "name is given")
+
+    instance = DummyUserModel(id=33, name='Dummy One', age=20)
+
+    instance.set.when.called_with(
+        name="Another Two",
+        age=40,
+        foo="bar"
+    ).should.throw(
+        InvalidColumnName,
+        "<DummyUserModel id=33>.foo",
+    )
 
 
 def test_model_equality():

@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright © 2013 Gabriel Falcão <gabriel@weedlabs.io>
 #
 
+import json
 import sqlalchemy as db
 from mock import patch, call, Mock
-from datetime import datetime, date
+from datetime import datetime, date, time
 from decimal import Decimal
 from bong.framework.db import (
     Model,
@@ -165,7 +165,6 @@ def test_model_serialize_value_callable():
     j.serialize_value('created_at', None).should.equal('2012-12-12T00:00:00')
 
 
-
 def test_model_serialize_value_not_callable():
     ("Model.serialize_value should try to use the default if the "
      "given value is falsy and default value is NOT callable")
@@ -247,6 +246,55 @@ def test_model_get():
     instance.get('name').should.equal('Jeez')
     instance.get('age').should.be.none
     instance.get('age', 123).should.equal(123)
+
+
+def test_model_set():
+    ("Model#set can set many keyword arguments at "
+     "once for a sinle model instance")
+
+    instance = DummyUserModel(name='Dummy One', age=20)
+    instance.save = Mock()
+    instance.set(
+        name="Another Two",
+        age=40,
+    )
+
+    instance.name.should.equal("Another Two")
+    instance.age.should.equal(40)
+
+    instance.save.called.should.be.false
+
+
+def test_model_set_invalid_col():
+    ("Model#set raises InvalidColumnName if an invalid "
+     "name is given")
+
+    instance = DummyUserModel(id=33, name='Dummy One', age=20)
+
+    instance.set.when.called_with(
+        name="Another Two",
+        age=40,
+        foo="bar"
+    ).should.throw(
+        InvalidColumnName,
+        "<DummyUserModel id=33>.foo",
+    )
+
+
+@patch.object(DummyUserModel, 'find_one_by')
+def test_model_refresh(find_one_by):
+    ("Model#refresh should find the newest data and "
+     "update itself with that data")
+
+    find_one_by.return_value.__data__ = {'name': "NEW TWO"}
+    instance = DummyUserModel(id=44, name='Dummy One', age=20)
+    instance.refresh()
+
+    find_one_by.assert_called_once_with(
+        id=44
+    )
+
+    instance.name.should.equal("NEW TWO")
 
 
 def test_model_equality():
