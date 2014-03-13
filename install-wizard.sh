@@ -33,6 +33,7 @@ easy_install curdling
 curd install -r development.txt
 
 ./rename-inline.sh Bong $ApplicationName
+find . -name '*.manifest' -delete
 mv bong `printf $ApplicationName | tr '[:upper:]' '[:lower:]'`
 git add `printf $ApplicationName | tr '[:upper:]' '[:lower:]'`
 
