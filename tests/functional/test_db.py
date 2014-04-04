@@ -11,13 +11,18 @@ from bong.framework.db import (
     InvalidColumnName,
     EngineNotSpecified,
     MultipleEnginesSpecified,
+    PrimaryKey,
+    DefaultForeignKey,
 )
 
 metadata = MetaData()
 
+
 class DummyUserModel(Model):
-    table = db.Table('dummy_user_model', metadata,
-        db.Column('id', db.Integer, primary_key=True),
+    table = db.Table(
+        'dummy_user_model',
+        metadata,
+        PrimaryKey(),
         db.Column('name', db.String(80)),
         db.Column('age', db.Integer),
     )
@@ -28,11 +33,24 @@ def now():
 
 
 class ExquisiteModel(Model):
-    table = db.Table('dummy_exquisite', metadata,
-        db.Column('id', db.Integer, primary_key=True),
+    table = db.Table(
+        'dummy_exquisite',
+        metadata,
+        PrimaryKey(),
         db.Column('score', db.Numeric(), default='10.3'),
         db.Column('created_at', db.DateTime(), default=now),
     )
+
+
+class ChildModel(Model):
+    table = db.Table(
+        'dummy_child',
+        metadata,
+        PrimaryKey(),
+        db.Column('score', db.Numeric(), default='10.3'),
+        DefaultForeignKey('exquisiteness_id', 'dummy_exquisite.id'),
+    )
+
 
 @specification
 def test_user_signup(context):
@@ -56,6 +74,7 @@ def test_user_signup(context):
     created.should.have.property('gravatar_id').being.equal('somehexcode')
     created.should.have.property('email').being.equal('octocat@github.com')
 
+
 @specification
 def test_user_all(context):
     ("User.all() should return all existing users")
@@ -69,6 +88,7 @@ def test_user_all(context):
     created = User.create(**data)
 
     User.all().should.contain(created)
+
 
 def test_creating_model_with_invalid_keyword_arguments():
     ("Instantiating a model with invalid fields as keyword "
@@ -88,7 +108,6 @@ def test_model_represented_as_string():
 
 def test_model_to_dict():
     "Model.to_dict should return prepare the model data to be serialized"
-
 
     j = ExquisiteModel(score=Decimal('2.3'), created_at=datetime(2010, 10, 10))
 

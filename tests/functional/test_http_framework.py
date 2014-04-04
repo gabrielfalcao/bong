@@ -51,7 +51,7 @@ def test_api_handle_error_json(request):
 def test_absolute_url():
     ("absolute_url should take a path and return the full url for that path")
     # Background
-    settings.SCHEME = 'http://'
+    settings.SCHEMA = 'http://'
     settings.DOMAIN = 'mywebsite.com'
 
     # Given a path
@@ -65,10 +65,10 @@ def test_absolute_url():
 
 
 def test_absolute_url_overwriting_scheme():
-    ("absolute_url should ignore the settings.SCHEME variable when "
+    ("absolute_url should ignore the settings.SCHEMA variable when "
      "it's passed as argument")
     # Background
-    settings.SCHEME = 'WRONG://'
+    settings.SCHEMA = 'WRONG://'
     settings.DOMAIN = 'mywebsite.com'
 
     # Given a path
@@ -84,7 +84,7 @@ def test_absolute_url_overwriting_scheme():
 def test_ssl_absolute_url():
     ("ssl_absolute_url should take a path and return the full url for that path")
     # Background
-    settings.SCHEME = 'http://'
+    settings.SCHEMA = 'http://'
     settings.DOMAIN = 'mywebsite.com'
 
     # Given a path

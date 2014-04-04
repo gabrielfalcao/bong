@@ -17,7 +17,7 @@ logger = get_logger()
 
 def absolute_url(path, scheme=None):
     """returns the full url for the given path. The scheme (http:// or
-    https://) is defined inside of settings.SCHEME which is guessed by
+    https://) is defined inside of settings.SCHEMA which is guessed by
     the PORT environment variable. If the PORT is 443, then the scheme
     will be 'https://'
 
@@ -27,7 +27,7 @@ def absolute_url(path, scheme=None):
     'http://localhost:5000/deals'
     """
     return "{0}{1}/{2}".format(
-        scheme or settings.SCHEME,
+        scheme or settings.SCHEMA,
         settings.DOMAIN,
         path.lstrip('/'),
     )
@@ -71,6 +71,11 @@ def json_representation(data, code, headers):
 def json_response(data, code, headers={}):
     serialized = json.dumps(data, indent=2)
     headers['Content-Type'] = 'application/json'
+
+    for key in headers.keys():
+        value = headers.pop(key)
+        headers[str(key)] = str(value)
+
     return Response(serialized, status=code, headers=headers)
 
 

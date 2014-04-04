@@ -50,5 +50,5 @@ class Shell(Command):  # pragma: no cover
             msg = ("You need to install \033[32mIPython\033[0m in "
                    "order to use the bong shell\n")
             sys.stderr.write(msg)
-
+            return
         embed()

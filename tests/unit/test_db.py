@@ -2,10 +2,9 @@
 # -*- coding: utf-8 -*-
 #
 
-import json
 import sqlalchemy as db
 from mock import patch, call, Mock
-from datetime import datetime, date, time
+from datetime import datetime, date
 from decimal import Decimal
 from bong.framework.db import (
     Model,
@@ -15,6 +14,8 @@ from bong.framework.db import (
     EngineNotSpecified,
     MultipleEnginesSpecified,
     get_redis_connection,
+    DefaultForeignKey,
+    PrimaryKey
 )
 
 
@@ -927,3 +928,38 @@ def test_model_all_calls_manager_with_default_engine(engine):
 
     # And it should have been called appropriately
     ManagedModel.using.assert_called_once_with(engine)
+
+
+@patch('bong.framework.db.db.Column')
+@patch('bong.framework.db.db.Integer')
+@patch('bong.framework.db.db.ForeignKey')
+def test_default_primary_key(ForeignKey, Integer, Column):
+    "DefaultForeignKey should be a shortcut to a db.Column"
+
+    fk = DefaultForeignKey("school_id", "user.id")
+    fk.should.equal(Column.return_value)
+
+    Column.assert_called_once_with(
+        "school_id",
+        Integer,
+        ForeignKey.return_value,
+        nullable=False,
+    )
+
+    ForeignKey.assert_called_once_with(
+        "user.id", ondelete="CASCADE")
+
+
+@patch('bong.framework.db.db.Column')
+@patch('bong.framework.db.db.Integer')
+def test_primary_key(Integer, Column):
+    "PrimaryKey should be a shortcut to a db.Column"
+
+    pk = PrimaryKey("uuid")
+    pk.should.equal(Column.return_value)
+
+    Column.assert_called_once_with(
+        "uuid",
+        Integer,
+        primary_key=True,
+    )

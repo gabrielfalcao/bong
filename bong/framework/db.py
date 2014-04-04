@@ -41,6 +41,17 @@ def get_redis_connection(db=0):
     )
 
 
+def DefaultForeignKey(field_name, parent_field_name,
+                      ondelete=b'CASCADE', nullable=False, **kw):
+    return db.Column(field_name, db.Integer,
+                     db.ForeignKey(parent_field_name, ondelete=ondelete),
+                     nullable=nullable, **kw)
+
+
+def PrimaryKey(name=b'id'):
+    return db.Column(name, db.Integer, primary_key=True)
+
+
 class ORM(type):
     def __init__(cls, name, bases, attrs):
         if not hasattr(cls, 'table'):

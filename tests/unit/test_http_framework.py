@@ -20,7 +20,7 @@ from bong.framework.http import (
 def test_absolute_url(settings):
     ("absolute_url should take a path and return the full url for that path")
     # Background
-    settings.SCHEME = 'http://'
+    settings.SCHEMA = 'http://'
     settings.DOMAIN = 'mywebsite.com'
 
     # Given a path
@@ -35,9 +35,9 @@ def test_absolute_url(settings):
 
 @patch('bong.framework.http.settings')
 def test_absolute_url_overwriting_scheme(settings):
-    ("absolute_url should ignore the settings.SCHEME variable when it's passed as argument")
+    ("absolute_url should ignore the settings.SCHEMA variable when it's passed as argument")
     # Background
-    settings.SCHEME = 'WRONG://'
+    settings.SCHEMA = 'WRONG://'
     settings.DOMAIN = 'mywebsite.com'
 
     # Given a path
@@ -54,7 +54,7 @@ def test_absolute_url_overwriting_scheme(settings):
 def test_ssl_absolute_url(settings):
     ("ssl_absolute_url should take a path and return the full url for that path")
     # Background
-    settings.SCHEME = 'http://'
+    settings.SCHEMA = 'http://'
     settings.DOMAIN = 'mywebsite.com'
 
     # Given a path
