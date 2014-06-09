@@ -261,7 +261,7 @@ class Model(object):
         return dict([(k, self.serialize_value(k, self.__data__.get(k))) for k in self.__columns__.keys()])
 
     def to_insert_params(self):
-        data = self.serialize()
+        data = Model.serialize(self)
 
         primary_key_names = [x.name for x in self.table.primary_key.columns]
         keys_to_pluck = filter(lambda x: x not in self.__columns__, data.keys()) + primary_key_names
