@@ -1,11 +1,11 @@
 {
   "name": "bong",
   "version": "0.0.1",
-  "devDependencies": {
+  "dependencies": {
     "angular": "~1.2.3",
     "bootstrap": "~3.1.1",
     "bootswatch": "~3.1.1",
-    "angular-local-storage": "*",
+    "angular-local-storage": "0.0.5",
     "angular-ui-router": "~0.2.10"
   }
 }
