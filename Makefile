@@ -50,3 +50,4 @@ prod-simulation:
 
 static:
 	bower install
+	python manage.py assets build
