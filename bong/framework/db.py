@@ -1,13 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+# Copyright © 2013 Gabriel Falcao <gabriel@nacaolivre.org>
 # flake8: noqa
+
 from __future__ import unicode_literals
 import __builtin__
 
+import json as pyjson
 import inspect
 import dateutil.parser
 import datetime
+import nacl.secret
+import nacl.utils
 from functools import partial
 from decimal import Decimal
 
@@ -19,11 +23,17 @@ import sqlalchemy as db
 from sqlalchemy import (
     create_engine,
     MetaData,
+    func
 )
+
+from .log import get_logger
+# 199-202, 208-209, 216
 
 engine = create_engine(settings.SQLALCHEMY_DATABASE_URI)
 metadata = MetaData()
+logger = get_logger()
 
+format_decimal = lambda num: '{0:.2f}'.format(num)
 
 def get_redis_connection(db=0):
     """This function knows how to return a new `redis.StrictRedis`
@@ -40,16 +50,27 @@ def get_redis_connection(db=0):
         password=conf.path,
     )
 
+def import_fixture(filename):
+    created = []
+    with open(filename) as f:
+        fixtures = pyjson.load(f)
+        for fixture in fixtures:
+            cls = getattr(ORM, fixture['model'])
+            instance = cls.create(**fixture['data'])
+            created.append(instance)
+
+    return created
 
 def DefaultForeignKey(field_name, parent_field_name,
-                      ondelete=b'CASCADE', nullable=False, **kw):
+                      ondelete='CASCADE', nullable=False, **kw):
     return db.Column(field_name, db.Integer,
                      db.ForeignKey(parent_field_name, ondelete=ondelete),
                      nullable=nullable, **kw)
 
 
-def PrimaryKey(name=b'id'):
+def PrimaryKey(name='id'):
     return db.Column(name, db.Integer, primary_key=True)
+
 
 
 class ORM(type):
@@ -70,13 +91,17 @@ class Manager(object):
         self.engine = engine
 
     def from_result_proxy(self, proxy, result):
-        """Creates a new instance of the model given a sqlalchemy
-        result proxy"""
+        """Creates a new instance of the model given
+        a sqlalchemy result proxy"""
         if not result:
             return None
 
         data = dict(zip(proxy.keys(), result))
         return self.model(engine=self.engine, **data)
+
+    def many_from_result_proxy(self, proxy):
+        Models = partial(self.from_result_proxy, proxy)
+        return map(Models, proxy.fetchall())
 
     def create(self, **data):
         """Creates a new model and saves it to MySQL"""
@@ -94,7 +119,7 @@ class Manager(object):
 
         return instance
 
-    def query_by(self, order_by=None, **kw):
+    def query_by(self, order_by=None, limit_by=None, offset_by=None, **kw):
         """Queries the table with the given keyword-args and
         optionally a single order_by field.  This method is used
         internally and is not consistent with the other ORM methods by
@@ -103,11 +128,40 @@ class Manager(object):
         conn = self.get_connection()
         query = self.model.table.select()
         for field, value in kw.items():
-            query = query.where(getattr(self.model.table.c, field) == value)
+            if hasattr(self.model.table.c, field):
+                query = query.where(getattr(self.model.table.c, field) == value)
+            elif '__' in field:
+                field, modifier = field.split('__', 1)
+                f = getattr(self.model.table.c, field)
+                if modifier == 'startswith':
+                    query = query.where(f.startswith(value))
+                else:
+                    msg = '"{}" is in invalid query modifier.'.format(modifier)
+                    raise InvalidQueryModifier(msg)
+            else:
+                msg = 'The field "{}" does not exist.'.format(field)
+                raise InvalidColumnName(msg)
+
+        if isinstance(limit_by, (float, int)):
+            query = query.limit(limit_by)
+
+        if isinstance(offset_by, (float, int)):
+            query = query.offset(offset_by)
 
         proxy = conn.execute(query.order_by(db.desc(
             getattr(self.model.table.c, order_by or 'id'))))
+
         return proxy
+
+    def many_from_query(self, query):
+        conn = self.get_connection()
+        proxy = conn.execute(query)
+        return self.many_from_result_proxy(proxy)
+
+    def one_from_query(self, query):
+        conn = self.get_connection()
+        proxy = conn.execute(query)
+        return self.from_result_proxy(proxy, proxy.fetchone())
 
     def find_one_by(self, **kw):
         """Find a single model that could be found in the database and
@@ -122,9 +176,25 @@ class Manager(object):
         Models = partial(self.from_result_proxy, proxy)
         return map(Models, proxy.fetchall())
 
-    def all(self):
-        """Returns all existing rows as Model goloka"""
-        return self.find_by()
+    def all(self, limit_by=None, offset_by=None):
+        """Returns all existing rows as Model"""
+        return self.find_by(
+            limit_by=limit_by,
+            offset_by=offset_by,
+        )
+
+    def total_rows(self, field_name='id', **where):
+        """Gets the total number of rows in the table"""
+        conn = self.get_connection()
+        query = self.model.table.count()
+        for key, value in where.items():
+            field = getattr(self.model.table.c, key, None)
+            if field is not None:
+                query = query.where(field == value)
+
+        proxy = conn.execute(query)
+
+        return proxy.scalar()
 
     def get_connection(self):
         return self.engine.connect()
@@ -144,7 +214,11 @@ class Model(object):
     query_by = classmethod(lambda cls, order_by=None, **kw: cls.using(engine).query_by(order_by, **kw))
     find_one_by = classmethod(lambda cls, **kw: cls.using(engine).find_one_by(**kw))
     find_by = classmethod(lambda cls, **kw: cls.using(engine).find_by(**kw))
-    all = classmethod(lambda cls: cls.using(engine).all())
+    all = classmethod(lambda cls, **kw: cls.using(engine).all(**kw))
+    total_rows = classmethod(lambda cls, **kw: cls.using(engine).total_rows(**kw))
+    get_connection = classmethod(lambda cls, **kw: cls.using(engine).get_connection())
+    many_from_query = classmethod(lambda cls, query: cls.using(engine).many_from_query(query))
+    one_from_query = classmethod(lambda cls, query: cls.using(engine).one_from_query(query))
 
     def __init__(self, engine=None, **data):
         '''A Model can be instantiated with keyword-arguments that
@@ -170,7 +244,11 @@ class Model(object):
         module = Model.__module__
         name = Model.__name__
         columns = self.__columns__.keys()
+        for key, value in data.items():
+            data[key] = self.decrypt_attribute(key, value)
+
         preprocessed_data = self.preprocess(data)
+
         if not isinstance(preprocessed_data, dict):
             raise InvalidModelDeclaration(
                 'The model `{0}` declares a preprocess method but '
@@ -197,6 +275,34 @@ class Model(object):
         it must return a dictionary"""
         return data
 
+    def get_encryption_box_for_attribute(self, attr):
+        keymap = dict(getattr(self, 'encryption', {}))
+        if attr not in keymap:
+            return
+
+        key = keymap[attr]
+
+        box = nacl.secret.SecretBox(key)
+        return box
+
+    def encrypt_attribute(self, attr, value):
+        box = self.get_encryption_box_for_attribute(attr)
+        if not box:
+            return value
+
+        nonce = nacl.utils.random(nacl.secret.SecretBox.NONCE_SIZE)
+        return box.encrypt(str(value), nonce)
+
+    def decrypt_attribute(self, attr, value):
+        box = self.get_encryption_box_for_attribute(attr)
+        if not box:
+            return value
+
+        try:
+            return box.decrypt(value)
+        except ValueError:
+            return value
+
     def serialize_value(self, attr, value):
         col = self.table.columns[attr]
 
@@ -207,7 +313,7 @@ class Model(object):
                 value = col.default.arg
 
         if isinstance(value, Decimal):
-            return str(value)
+            return format_decimal(value)
 
         date_types = (datetime.datetime, datetime.date, datetime.time)
         if isinstance(value, date_types):
@@ -224,6 +330,8 @@ class Model(object):
         return value
 
     def deserialize_value(self, attr, value):
+        value = self.decrypt_attribute(attr, value)
+
         date_types = (datetime.datetime, datetime.date)
 
         kind = self.__columns__.get(attr, None)
@@ -261,7 +369,11 @@ class Model(object):
         return dict([(k, self.serialize_value(k, self.__data__.get(k))) for k in self.__columns__.keys()])
 
     def to_insert_params(self):
-        data = Model.serialize(self)
+        pre_data = Model.serialize(self)
+        data = {}
+
+        for k, v in pre_data.items():
+            data[k] = self.encrypt_attribute(k, v)
 
         primary_key_names = [x.name for x in self.table.primary_key.columns]
         keys_to_pluck = filter(lambda x: x not in self.__columns__, data.keys()) + primary_key_names
@@ -381,6 +493,10 @@ class EngineNotSpecified(Exception):
 
 
 class InvalidColumnName(Exception):
+    pass
+
+
+class InvalidQueryModifier(Exception):
     pass
 
 

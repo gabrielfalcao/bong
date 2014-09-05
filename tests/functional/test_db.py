@@ -3,26 +3,23 @@
 
 from mock import Mock
 from .base import specification, User
-from datetime import datetime, date
+from datetime import datetime
 from decimal import Decimal
 from bong.framework.db import (
     Model, db, MetaData,
     InvalidModelDeclaration,
     InvalidColumnName,
     EngineNotSpecified,
+    InvalidQueryModifier,
     MultipleEnginesSpecified,
-    PrimaryKey,
-    DefaultForeignKey,
 )
 
 metadata = MetaData()
 
 
 class DummyUserModel(Model):
-    table = db.Table(
-        'dummy_user_model',
-        metadata,
-        PrimaryKey(),
+    table = db.Table('dummy_user_model', metadata,
+        db.Column('id', db.Integer, primary_key=True),
         db.Column('name', db.String(80)),
         db.Column('age', db.Integer),
     )
@@ -33,22 +30,10 @@ def now():
 
 
 class ExquisiteModel(Model):
-    table = db.Table(
-        'dummy_exquisite',
-        metadata,
-        PrimaryKey(),
+    table = db.Table('dummy_exquisite', metadata,
+        db.Column('id', db.Integer, primary_key=True),
         db.Column('score', db.Numeric(), default='10.3'),
         db.Column('created_at', db.DateTime(), default=now),
-    )
-
-
-class ChildModel(Model):
-    table = db.Table(
-        'dummy_child',
-        metadata,
-        PrimaryKey(),
-        db.Column('score', db.Numeric(), default='10.3'),
-        DefaultForeignKey('exquisiteness_id', 'dummy_exquisite.id'),
     )
 
 
@@ -111,7 +96,7 @@ def test_model_to_dict():
 
     j = ExquisiteModel(score=Decimal('2.3'), created_at=datetime(2010, 10, 10))
 
-    j.to_dict().should.equal({'score': '2.3', 'created_at': '2010-10-10T00:00:00', 'id': None})
+    j.to_dict().should.equal({'score': '2.30', 'created_at': '2010-10-10T00:00:00', 'id': None})
 
 
 def test_preprocess_should_return_dict():
@@ -119,9 +104,9 @@ def test_preprocess_should_return_dict():
 
     class AnotherUserModel(Model):
         table = db.Table('another_user_model', metadata,
-            db.Column('id', db.Integer, primary_key=True),
-            db.Column('name', db.String(80)),
-            db.Column('age', db.Integer),
+                         db.Column('id', db.Integer, primary_key=True),
+                         db.Column('name', db.String(80)),
+                         db.Column('age', db.Integer),
         )
 
         def preprocess(self, data):
@@ -210,7 +195,6 @@ def test_get_engine_when_already_has_one(context):
     )
 
 
-
 @specification
 def test_user_signup_get_or_create_doesnt_exist(context):
     ("User.get_or_create(dict) should get"
@@ -257,11 +241,36 @@ def test_find_one_by_not_exists(context):
 
     User.find_one_by(username='octocat').should.be.none
 
+
 @specification
 def test_query_by_not_exists(context):
     ("User.query_by(**kwargs) should return None if does not exist")
 
     list(User.query_by(username='octocat')).should.be.empty
+
+
+@specification
+def test_query_by_invalid_column(context):
+    ("User.query_by(**kwargs) should raise an exception if the field does not"
+     " exist")
+
+    User.query_by.when.called_with(
+        invalidfield="some value",
+    ).should.throw(
+        InvalidColumnName
+    )
+
+
+@specification
+def test_query_by_invalid_query_modifier(context):
+    ("User.query_by(**kwargs) should raise an exception if the field does not"
+     " exist")
+
+    User.query_by.when.called_with(
+        email__invalidmodifier="some value",
+    ).should.throw(
+        InvalidQueryModifier
+    )
 
 
 @specification
@@ -300,6 +309,52 @@ def test_find_by(context):
     ])
 
 
+@specification
+def test_find_by_with_limit_by(context):
+    ("User.find_by(limit_by=100, **kwargs) should limit the number of users")
+
+    data1 = {
+        "username": "octocat",
+        "github_id": 42,
+        "gravatar_id": "somehexcode2",
+        "email": "octocat@github.com",
+        "github_token": "toktok",
+    }
+
+    data2 = {
+        "username": "octopussy",
+        "github_id": 88,
+        "gravatar_id": "somehexcode1",
+        "email": "octopussy@github.com",
+        "github_token": "toktok",
+    }
+
+    User.create(**data1)
+    original_user2 = User.create(**data2)
+
+    User.find_by(github_token='toktok', limit_by=1).should.be.equal([
+        original_user2,
+    ])
+
+
+@specification
+def test_find_by_with_limit_by_and_offset(context):
+    ("User.find_by(limit_by=5, offset=3, **kwargs) should limit "
+     "to 2 users, offsetting 2 users")
+
+    make_user = lambda x: User.create(**{
+        "username": "octocat{0}".format(x),
+        "github_id": x,
+        "gravatar_id": "somehexcode{0}".format(x),
+        "email": "octocat{0}@github.com".format(x),
+        "github_token": "toktok{0}".format(x),
+    })
+
+    users = list(reversed([make_user(x) for x in range(10)]))
+
+    User.find_by(limit_by=5, offset_by=3).should.be.equal(users[3:8])
+
+
 def test_model_serialize_value_callable():
     ("Model.serialize_value should try to use the default if the "
      "given value is falsy and default value is callable")
@@ -309,7 +364,6 @@ def test_model_serialize_value_callable():
     j.serialize_value('created_at', '').should.equal('2012-12-12T00:00:00')
     j.serialize_value('created_at', False).should.equal('2012-12-12T00:00:00')
     j.serialize_value('created_at', None).should.equal('2012-12-12T00:00:00')
-
 
 
 def test_model_serialize_value_not_callable():
@@ -329,8 +383,8 @@ def test_model_deserialize_value():
     # Given a model that has a DateTime field
     class DatetimeSensitiveModel(Model):
         table = db.Table('datetime_sensitive_model', metadata,
-            db.Column('id', db.Integer, primary_key=True),
-            db.Column('a_date_field', db.DateTime()),
+                         db.Column('id', db.Integer, primary_key=True),
+                         db.Column('a_date_field', db.DateTime()),
         )
 
     # And an instance of that model
@@ -341,28 +395,6 @@ def test_model_deserialize_value():
 
     # Then it should be a real datetime
     value.should.be.a(datetime)
-    value.year.should.equal(2010)
-    value.month.should.equal(10)
-    value.day.should.equal(10)
-
-def test_model_deserialize_value():
-    "Model.deserialize_value should parse date values"
-
-    # Given a model that has a Date field
-    class DateSensitiveModel(Model):
-        table = db.Table('date_sensitive_model', metadata,
-            db.Column('id', db.Integer, primary_key=True),
-            db.Column('a_date_field', db.Date()),
-        )
-
-    # And an instance of that model
-    j = DateSensitiveModel()
-
-    # When I deserialize a value for that field
-    value = j.deserialize_value('a_date_field', '2010-10-10 00:00:00')
-
-    # Then it should be a real date
-    value.should.be.a(date)
     value.year.should.equal(2010)
     value.month.should.equal(10)
     value.day.should.equal(10)
@@ -450,21 +482,3 @@ def test_model_equality_no_id():
 
     instance.should_not.equal(other_instance)
     instance.should.equal(third_instance)
-
-
-@specification
-def test_model_refresh(context):
-    "Models can be refreshed"
-
-    data = {
-        "username": "octocat",
-        "gravatar_id": "somehexcode",
-        "email": "octocat@github.com",
-        "github_token": 'toktok',
-        "github_id": '123',
-    }
-    instance = User.create(**data)
-    instance.username = 'foo'
-    instance.username.should.equal('foo')
-    instance.refresh()
-    instance.username.should.equal('octocat')

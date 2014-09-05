@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# Copyright © 2013 Gabriel Falcao <gabriel@nacaolivre.org>
 #
 
 import sqlalchemy as db
-from mock import patch, call, Mock
+from mock import patch, call, Mock, mock_open
 from datetime import datetime, date
 from decimal import Decimal
 from bong.framework.db import (
@@ -11,11 +12,11 @@ from bong.framework.db import (
     Manager,
     InvalidModelDeclaration,
     InvalidColumnName,
+    InvalidQueryModifier,
     EngineNotSpecified,
     MultipleEnginesSpecified,
     get_redis_connection,
-    DefaultForeignKey,
-    PrimaryKey
+    import_fixture,
 )
 
 
@@ -42,6 +43,17 @@ class ExquisiteModel(Model):
     )
 
 
+class FakeEncryptionModel(Model):
+    table = db.Table('fake_enc_model', metadata,
+                     db.Column('id', db.Integer, primary_key=True),
+                     db.Column('name', db.String(80)),
+                     db.Column('age', db.Integer),
+    )
+    encryption = {
+        'name': 'fake-encryption-key1'
+    }
+
+
 class TestManager(Manager):
 
     def __init__(self):
@@ -60,7 +72,6 @@ class ModelInputTestManager(Manager):
     def __init__(self, model):
         self.model = model
         self.engine = Mock()
-
 
 
 def test_instantiating_model_with_preprocessed_data():
@@ -121,7 +132,7 @@ def test_model_to_dict():
 
     j = ExquisiteModel(score=Decimal('2.3'), created_at=datetime(2010, 10, 10))
 
-    j.to_dict().should.equal({'score': '2.3', 'created_at': '2010-10-10T00:00:00', 'id': None})
+    j.to_dict().should.equal({'score': '2.30', 'created_at': '2010-10-10T00:00:00', 'id': None})
 
 
 def test_model_to_insert_params():
@@ -136,7 +147,7 @@ def test_model_to_insert_params():
 
     j = MyModel(score=Decimal('2.3'), created_at=datetime(2010, 10, 10))
 
-    j.to_insert_params().should.equal({'score': '2.3', 'created_at': '2010-10-10T00:00:00'})
+    j.to_insert_params().should.equal({'score': '2.30', 'created_at': '2010-10-10T00:00:00'})
 
 
 def test_model_serialize_value_decimal():
@@ -144,7 +155,7 @@ def test_model_serialize_value_decimal():
 
     j = ExquisiteModel()
 
-    j.serialize_value('score', Decimal('10.3')).should.equal('10.3')
+    j.serialize_value('score', Decimal('10.3')).should.equal('10.30')
 
 
 def test_model_serialize_value_datetime():
@@ -495,6 +506,7 @@ def test_model_delete():
     str(query).should.equal(
         'DELETE FROM my_deletable_model WHERE my_deletable_model.id = :id_1')
 
+
 def test_manager_find_one_by():
 
     ("Manager#find_one_by finds one record based on the keyword-arguments.")
@@ -574,7 +586,31 @@ def test_manager_all():
     manager = MyTestManager()
 
     manager.all().should.equal("the result")
-    manager.find_by.assert_called_once_with()
+    manager.find_by.assert_called_once_with(limit_by=None, offset_by=None)
+
+
+def test_manager_all_with_limit():
+
+    class MyTestManager(TestManager):
+        find_by = Mock(return_value="the result")
+
+    manager = MyTestManager()
+
+    manager.all(limit_by=100).should.equal("the result")
+    manager.find_by.assert_called_once_with(limit_by=100, offset_by=None)
+
+
+def test_manager_all_with_offset():
+
+    class MyTestManager(TestManager):
+        find_by = Mock(return_value="the result")
+
+    manager = MyTestManager()
+
+    manager.all(offset_by=100, limit_by=20).should.equal("the result")
+    manager.find_by.assert_called_once_with(limit_by=20, offset_by=100)
+
+
 
 
 def test_manager_get_connection():
@@ -618,6 +654,7 @@ def test_from_result_proxy_with_result():
 
     manager = Manager(model, engine_mock)
     manager.from_result_proxy(proxy, ('Foobar', 1, 33)).should.be.a(DummyUserModel)
+
 
 
 def test_manager_create():
@@ -779,7 +816,7 @@ def test_query_by():
     # Then the result should be the result proxy
     result.should.equal(proxy)
 
-    # And the query must be corretly done
+    # And the query must be correctly done
     connection_mock.execute.called.should.be.true
 
     x = connection_mock.execute.call_args[0][0]
@@ -788,6 +825,162 @@ def test_query_by():
         'FROM dummy_user_model \n'
         'WHERE dummy_user_model.name = :name_1 '
         'ORDER BY dummy_user_model.id DESC')
+
+
+def test_query_by_limit_by():
+    ("Manager#query_by accept the special case argument `limit_by`")
+
+    # Given a DB connection
+    connection_mock = Mock()
+
+    class MyDummyUserModel(DummyUserModel):
+        pass
+
+    class MyDummyUserManager(TestManager):
+        model = MyDummyUserModel
+        get_connection = Mock(return_value=connection_mock)
+
+    manager = MyDummyUserManager()
+
+    # And its result proxy
+    proxy = connection_mock.execute.return_value
+
+    # When I try to query a manager by some field
+    result = manager.query_by(name='foo', limit_by=100)
+
+    # Then the result should be the result proxy
+    result.should.equal(proxy)
+
+    # And the query must be correctly done
+    connection_mock.execute.called.should.be.true
+
+    x = connection_mock.execute.call_args[0][0]
+    str(x).should.equal(
+        'SELECT dummy_user_model.id, dummy_user_model.name, dummy_user_model.age \n'
+        'FROM dummy_user_model \n'
+        'WHERE dummy_user_model.name = :name_1 '
+        'ORDER BY dummy_user_model.id DESC\n '
+        'LIMIT :param_1')
+
+
+def test_query_by_offset_by():
+    ("Manager#query_by accept the special case argument `offset_by`")
+
+    # Given a DB connection
+    connection_mock = Mock()
+
+    class MyDummyUserModel(DummyUserModel):
+        pass
+
+    class MyDummyUserManager(TestManager):
+        model = MyDummyUserModel
+        get_connection = Mock(return_value=connection_mock)
+
+    manager = MyDummyUserManager()
+
+    # And its result proxy
+    proxy = connection_mock.execute.return_value
+
+    # When I try to query a manager by some field
+    result = manager.query_by(name='foo', offset_by=100)
+
+    # Then the result should be the result proxy
+    result.should.equal(proxy)
+
+    # And the query must be correctly done
+    connection_mock.execute.called.should.be.true
+
+    x = connection_mock.execute.call_args[0][0]
+    str(x).should.equal(
+        'SELECT dummy_user_model.id, dummy_user_model.name, dummy_user_model.age '
+        '\nFROM dummy_user_model \nWHERE dummy_user_model.name = :name_1 ORDER '
+        'BY dummy_user_model.id DESC\n LIMIT -1 OFFSET :param_1')
+
+
+def test_query_by_startswith():
+    ("Manager#query_by should allow the 'startswith' query modifier")
+    # Given a DB connection
+    connection_mock = Mock()
+
+    class MyDummyUserModel(DummyUserModel):
+        pass
+
+    class MyDummyUserManager(TestManager):
+        model = MyDummyUserModel
+        get_connection = Mock(return_value=connection_mock)
+
+    manager = MyDummyUserManager()
+
+    # And its result proxy
+    proxy = connection_mock.execute.return_value
+
+    # When I try to query a manager by some field
+    result = manager.query_by(name__startswith='foo')
+
+    # Then the result should be the result proxy
+    result.should.equal(proxy)
+
+    # And the query must be correctly done
+    connection_mock.execute.called.should.be.true
+
+    # And the SQL should be correct
+    x = connection_mock.execute.call_args[0][0]
+    str(x).should.equal(
+        "SELECT dummy_user_model.id, dummy_user_model.name,"
+        " dummy_user_model.age \nFROM dummy_user_model \nWHERE"
+        " dummy_user_model.name LIKE :name_1 || '%%' ORDER BY"
+        " dummy_user_model.id DESC"
+    )
+
+
+def test_query_by_invalid_column():
+    ("Calling Manager#query_by with an invalid field should cause an "
+     "exception")
+
+    # Given a DB connection
+    connection_mock = Mock()
+
+    # And a model and its manager
+    class MyDummyUserModel(DummyUserModel):
+        pass
+
+    class MyDummyUserManager(TestManager):
+        model = MyDummyUserModel
+        get_connection = Mock(return_value=connection_mock)
+
+    manager = MyDummyUserManager()
+
+    # If we query for an invalid field
+    manager.query_by.when.called_with(
+        invalid_field="some value",
+    ).should.throw(
+        InvalidColumnName
+    )
+
+
+def test_query_by_invalid_query_modifier():
+    ("Calling Manager#query_by with an invalid query modifier should cause an "
+     "exception")
+
+    # Given a DB connection
+    connection_mock = Mock()
+
+    # And a model and its manager
+    class MyDummyUserModel(DummyUserModel):
+        pass
+
+    class MyDummyUserManager(TestManager):
+        model = MyDummyUserModel
+        get_connection = Mock(return_value=connection_mock)
+
+    manager = MyDummyUserManager()
+
+    # If we query with an invalid modifier
+    manager.query_by.when.called_with(
+        name__somemodifier="some value",
+    ).should.throw(
+        InvalidQueryModifier
+    )
 
 
 @patch('bong.framework.db.StrictRedis')
@@ -802,6 +995,46 @@ def test_get_redis_connection(StrictRedis):
         port=6379,
         password=''
     )
+    conn.should.equal(StrictRedis.return_value)
+
+
+@patch('bong.framework.db.pyjson')
+@patch('bong.framework.db.ORM')
+def test_import_fixture(ORM, pyjson):
+    ("import_fixture() should create models from a JSON file")
+
+    _open = mock_open()
+    with patch('bong.framework.db.open', _open, create=True):
+        # Given that a file has correctly formatted JSON data
+        data = [
+            {
+                "model": "Deal",
+                "data": {
+                    "min_alloc": 100,
+                    "max_alloc": 200
+                }
+            },
+            {
+                "model": "Deal",
+                "data": {
+                    "min_alloc": 300,
+                    "max_alloc": 400
+                }
+            }
+        ]
+        pyjson.load.return_value = data
+
+        # When importing a fixture
+        filename = 'some_filename.json'
+        import_fixture(filename)
+
+        # The file should have been opened
+        _open.assert_called_once_with(filename)
+
+        # And objects should have been created
+        ORM.Deal.create.call_count.should.be(2)
+        calls = [call(**data[0]['data']), call(**data[1]['data'])]
+        ORM.Deal.create.assert_has_calls(calls)
 
 
 @patch('bong.framework.db.engine')
@@ -930,36 +1163,294 @@ def test_model_all_calls_manager_with_default_engine(engine):
     ManagedModel.using.assert_called_once_with(engine)
 
 
-@patch('bong.framework.db.db.Column')
-@patch('bong.framework.db.db.Integer')
-@patch('bong.framework.db.db.ForeignKey')
-def test_default_primary_key(ForeignKey, Integer, Column):
-    "DefaultForeignKey should be a shortcut to a db.Column"
+@patch('bong.framework.db.nacl.utils.random')
+@patch('bong.framework.db.nacl.secret.SecretBox')
+def test_model_get_encryption_box_for_attribute(SecretBox, random):
+    ("Model.get_encryption_box_for_attribute should return a SecretBox")
 
-    fk = DefaultForeignKey("school_id", "user.id")
-    fk.should.equal(Column.return_value)
+    fem = FakeEncryptionModel()
 
-    Column.assert_called_once_with(
-        "school_id",
-        Integer,
-        ForeignKey.return_value,
-        nullable=False,
+    box = fem.get_encryption_box_for_attribute('name')
+
+    box.should.equal(SecretBox.return_value)
+
+    SecretBox.assert_called_once_with('fake-encryption-key1')
+
+
+@patch('bong.framework.db.nacl.utils.random')
+@patch('bong.framework.db.nacl.secret.SecretBox')
+def test_model_encrypt_value(SecretBox, random):
+    "Model.encrypt_attribute should use a SecretBox and a nonce to encrypt the data"
+
+    SecretBox.NONCE_SIZE = 4269
+    random.return_value = 'a random value'
+
+    class MyEncModel(FakeEncryptionModel):
+        get_encryption_box_for_attribute = Mock(
+            name='MyEncModel.get_encryption_box_for_attribute')
+
+    box_mock = MyEncModel.get_encryption_box_for_attribute.return_value
+
+    fem = MyEncModel()
+    result = fem.encrypt_attribute("name", 'gabriel')
+
+    result.should.equal(box_mock.encrypt.return_value)
+    box_mock.encrypt.assert_called_once_with(b'gabriel', 'a random value')
+    random.assert_called_once_with(4269)
+
+
+@patch('bong.framework.db.nacl.secret.SecretBox')
+def test_model_decrypt_value(SecretBox):
+    "Model.decrypt_attribute should use a secret box to decrypt the data"
+
+    SecretBox.NONCE_SIZE = 4269
+
+    class MyEncModel(FakeEncryptionModel):
+        get_encryption_box_for_attribute = Mock(
+            name='MyEncModel.get_encryption_box_for_attribute')
+
+    box_mock = MyEncModel.get_encryption_box_for_attribute.return_value
+
+    fem = MyEncModel()
+    result = fem.decrypt_attribute("name", 'THIS|IS|ENCRYPTED|DATA')
+
+    result.should.equal(box_mock.decrypt.return_value)
+    box_mock.decrypt.assert_called_once_with(b'THIS|IS|ENCRYPTED|DATA')
+
+
+@patch('bong.framework.db.nacl.secret.SecretBox')
+def test_decrypt_value_already_decrypted(SecretBox):
+    "Model.decrypt_attribute should ignore ValueError"
+
+    SecretBox.NONCE_SIZE = 4269
+
+    class MyEncModel(FakeEncryptionModel):
+        get_encryption_box_for_attribute = Mock(
+            name='MyEncModel.get_encryption_box_for_attribute')
+
+    box_mock = MyEncModel.get_encryption_box_for_attribute.return_value
+    box_mock.decrypt.side_effect = ValueError('boom')
+    fem = MyEncModel()
+    result = fem.decrypt_attribute("name", 'THIS|IS|ENCRYPTED|DATA')
+
+    result.should.equal("THIS|IS|ENCRYPTED|DATA")
+    box_mock.decrypt.assert_called_once_with(b'THIS|IS|ENCRYPTED|DATA')
+
+
+def test_total_rows_with_where():
+    ("Manager#total_rows should support giving the where clause kwargs")
+
+    # Given a DB connection
+    connection_mock = Mock()
+
+    class MyDummyUserModel(DummyUserModel):
+        pass
+
+    class MyDummyUserManager(TestManager):
+        model = MyDummyUserModel
+        get_connection = Mock(return_value=connection_mock)
+
+    manager = MyDummyUserManager()
+
+    # And its result proxy
+    proxy = connection_mock.execute.return_value
+
+    # When I try to query a manager by some field
+    result = manager.total_rows(age=26, unexisting_field=123)
+
+    # Then the result should be the result proxy
+    result.should.equal(proxy.scalar.return_value)
+
+    # And the query must be correctly done
+    connection_mock.execute.called.should.be.true
+
+    x = connection_mock.execute.call_args[0][0]
+    str(x).should.equal(
+        'SELECT count(dummy_user_model.id) AS tbl_row_count '
+        '\nFROM dummy_user_model \nWHERE dummy_user_model.age = :age_1')
+
+
+def test_total_rows():
+    ("Manager#total_rows should return the count")
+
+    # Given a DB connection
+    connection_mock = Mock()
+
+    class MyDummyUserModel(DummyUserModel):
+        pass
+
+    class MyDummyUserManager(TestManager):
+        model = MyDummyUserModel
+        get_connection = Mock(return_value=connection_mock)
+
+    manager = MyDummyUserManager()
+
+    # And its result proxy
+    proxy = connection_mock.execute.return_value
+
+    # When I try to query a manager by some field
+    result = manager.total_rows()
+
+    # Then the result should be the result proxy
+    result.should.equal(proxy.scalar.return_value)
+
+    # And the query must be correctly done
+    connection_mock.execute.called.should.be.true
+
+    x = connection_mock.execute.call_args[0][0]
+    str(x).should.equal(
+        'SELECT count(dummy_user_model.id) AS '
+        'tbl_row_count \nFROM dummy_user_model')
+
+
+@patch('bong.framework.db.engine')
+def test_model_total_rows_calls_manager_with_default_engine(engine):
+    ("Model.total_rows() should be a proxy to Model#using(engine).total_rows()")
+
+    # Given a subclass of Model that mocks the class method: using()
+    class ManagedModel(Model):
+        using = Mock(name='ManagedModel.using()')
+
+    # When I call total_rows
+    result = ManagedModel.total_rows(field_name='name')
+
+    # Then the result must have come from the mock
+    result.should.equal(ManagedModel.using.return_value.total_rows.return_value)
+
+    # And it should have been called appropriately
+    ManagedModel.using.return_value.total_rows.assert_called_once_with(field_name='name')
+
+    # And it should have been called appropriately
+    ManagedModel.using.assert_called_once_with(engine)
+
+
+@patch('bong.framework.db.Manager.from_result_proxy')
+def test_many_from_result_proxy(from_result_proxy):
+    "Manager#many_from_result_proxy should call "
+    "from_result_proxy on each item found in proxy.fetchall()"
+
+    from_result_proxy.side_effect = ['bound1', 'bound2']
+    proxy = Mock()
+    proxy.fetchall.return_value = ['item1', 'item2']
+
+    engine_mock = Mock()
+    model = DummyUserModel
+
+    manager = Manager(model, engine_mock)
+    result = manager.many_from_result_proxy(proxy)
+
+    from_result_proxy.assert_has_calls([
+        call(proxy, 'item1'),
+        call(proxy, 'item2'),
+    ])
+
+    result.should.equal(['bound1', 'bound2'])
+
+
+@patch('bong.framework.db.Manager.get_connection')
+@patch('bong.framework.db.Manager.many_from_result_proxy')
+def test_many_from_query(
+        many_from_result_proxy, get_connection):
+    ("Manager#many_from_query should execute the given "
+     "query and return many results from it")
+
+    connection = get_connection.return_value
+    proxy = connection.execute.return_value
+
+    engine_mock = Mock()
+    model = DummyUserModel
+
+    manager = Manager(model, engine_mock)
+    result = manager.many_from_query("the query")
+    result.should.equal(many_from_result_proxy.return_value)
+
+    connection.execute.assert_called_once_with('the query')
+    get_connection.assert_called_once_with()
+    many_from_result_proxy.assert_called_once_with(proxy)
+
+
+@patch('bong.framework.db.Manager.get_connection')
+@patch('bong.framework.db.Manager.from_result_proxy')
+def test_one_from_query(
+        from_result_proxy, get_connection):
+    ("Manager#one_from_query should execute the given "
+     "query and return the result")
+
+    connection = get_connection.return_value
+    proxy = connection.execute.return_value
+
+    engine_mock = Mock()
+    model = DummyUserModel
+
+    manager = Manager(model, engine_mock)
+    result = manager.many_from_result_proxy(proxy)
+
+    result = manager.one_from_query("the query")
+    result.should.equal(from_result_proxy.return_value)
+    from_result_proxy.assert_called_once_with(
+        proxy,
+        proxy.fetchone.return_value,
     )
 
-    ForeignKey.assert_called_once_with(
-        "user.id", ondelete="CASCADE")
+
+@patch('bong.framework.db.engine')
+def test_model_get_connection_calls_manager_with_default_engine(engine):
+    ("Model.get_connection() should be a proxy to Model#using(engine).get_connection()")
+
+    # Given a subclass of Model that mocks the class method: using()
+    class ManagedModel(Model):
+        using = Mock(name='ManagedModel.using()')
+
+    # When I call all
+    result = ManagedModel.get_connection()
+
+    # Then the result must have come from the mock
+    result.should.equal(ManagedModel.using.return_value.get_connection.return_value)
+
+    # And it should have been called appropriately
+    ManagedModel.using.return_value.get_connection.assert_called_once_with()
+
+    # And it should have been called appropriately
+    ManagedModel.using.assert_called_once_with(engine)
 
 
-@patch('bong.framework.db.db.Column')
-@patch('bong.framework.db.db.Integer')
-def test_primary_key(Integer, Column):
-    "PrimaryKey should be a shortcut to a db.Column"
+@patch('bong.framework.db.engine')
+def test_model_many_from_query_calls_manager_with_default_engine(engine):
+    ("Model.many_from_query() should be a proxy to Model#using(engine).many_from_query()")
 
-    pk = PrimaryKey("uuid")
-    pk.should.equal(Column.return_value)
+    # Given a subclass of Model that mocks the class method: using()
+    class ManagedModel(Model):
+        using = Mock(name='ManagedModel.using()')
 
-    Column.assert_called_once_with(
-        "uuid",
-        Integer,
-        primary_key=True,
-    )
+    # When I call all
+    result = ManagedModel.many_from_query("the query")
+
+    # Then the result must have come from the mock
+    result.should.equal(ManagedModel.using.return_value.many_from_query.return_value)
+
+    # And it should have been called appropriately
+    ManagedModel.using.return_value.many_from_query.assert_called_once_with("the query")
+
+    # And it should have been called appropriately
+    ManagedModel.using.assert_called_once_with(engine)
+
+
+@patch('bong.framework.db.engine')
+def test_model_one_from_query_calls_manager_with_default_engine(engine):
+    ("Model.one_from_query() should be a proxy to Model#using(engine).one_from_query()")
+
+    # Given a subclass of Model that mocks the class method: using()
+    class ManagedModel(Model):
+        using = Mock(name='ManagedModel.using()')
+
+    # When I call all
+    result = ManagedModel.one_from_query("the query")
+
+    # Then the result must have come from the mock
+    result.should.equal(ManagedModel.using.return_value.one_from_query.return_value)
+
+    # And it should have been called appropriately
+    ManagedModel.using.return_value.one_from_query.assert_called_once_with("the query")
+
+    # And it should have been called appropriately
+    ManagedModel.using.assert_called_once_with(engine)
