@@ -50,16 +50,6 @@ def get_redis_connection(db=0):
         password=conf.path,
     )
 
-def import_fixture(filename):
-    created = []
-    with open(filename) as f:
-        fixtures = pyjson.load(f)
-        for fixture in fixtures:
-            cls = getattr(ORM, fixture['model'])
-            instance = cls.create(**fixture['data'])
-            created.append(instance)
-
-    return created
 
 def DefaultForeignKey(field_name, parent_field_name,
                       ondelete='CASCADE', nullable=False, **kw):
@@ -68,9 +58,8 @@ def DefaultForeignKey(field_name, parent_field_name,
                      nullable=nullable, **kw)
 
 
-def PrimaryKey(name='id'):
+def PrimaryKey(name=b'id'):
     return db.Column(name, db.Integer, primary_key=True)
-
 
 
 class ORM(type):

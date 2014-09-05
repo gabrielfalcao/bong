@@ -16,7 +16,8 @@ from bong.framework.db import (
     EngineNotSpecified,
     MultipleEnginesSpecified,
     get_redis_connection,
-    import_fixture,
+    PrimaryKey,
+    DefaultForeignKey,
 )
 
 
@@ -25,10 +26,9 @@ metadata = db.MetaData()
 
 class DummyUserModel(Model):
     table = db.Table('dummy_user_model', metadata,
-        db.Column('id', db.Integer, primary_key=True),
-        db.Column('name', db.String(80)),
-        db.Column('age', db.Integer),
-    )
+                     PrimaryKey(),
+                     db.Column('name', db.String(80)),
+                     db.Column('age', db.Integer))
 
 
 def now():
@@ -37,10 +37,9 @@ def now():
 
 class ExquisiteModel(Model):
     table = db.Table('dummy_exquisite', metadata,
-        db.Column('id', db.Integer, primary_key=True),
-        db.Column('score', db.Numeric(), default='10.3'),
-        db.Column('created_at', db.DateTime(), default=now),
-    )
+                     PrimaryKey(),
+                     db.Column('score', db.Numeric(), default='10.3'),
+                     db.Column('created_at', db.DateTime(), default=now))
 
 
 class FakeEncryptionModel(Model):
@@ -48,6 +47,7 @@ class FakeEncryptionModel(Model):
                      db.Column('id', db.Integer, primary_key=True),
                      db.Column('name', db.String(80)),
                      db.Column('age', db.Integer),
+                     DefaultForeignKey('user_id', 'dummy_user_model.id')
     )
     encryption = {
         'name': 'fake-encryption-key1'
@@ -996,45 +996,6 @@ def test_get_redis_connection(StrictRedis):
         password=''
     )
     conn.should.equal(StrictRedis.return_value)
-
-
-@patch('bong.framework.db.pyjson')
-@patch('bong.framework.db.ORM')
-def test_import_fixture(ORM, pyjson):
-    ("import_fixture() should create models from a JSON file")
-
-    _open = mock_open()
-    with patch('bong.framework.db.open', _open, create=True):
-        # Given that a file has correctly formatted JSON data
-        data = [
-            {
-                "model": "Deal",
-                "data": {
-                    "min_alloc": 100,
-                    "max_alloc": 200
-                }
-            },
-            {
-                "model": "Deal",
-                "data": {
-                    "min_alloc": 300,
-                    "max_alloc": 400
-                }
-            }
-        ]
-        pyjson.load.return_value = data
-
-        # When importing a fixture
-        filename = 'some_filename.json'
-        import_fixture(filename)
-
-        # The file should have been opened
-        _open.assert_called_once_with(filename)
-
-        # And objects should have been created
-        ORM.Deal.create.call_count.should.be(2)
-        calls = [call(**data[0]['data']), call(**data[1]['data'])]
-        ORM.Deal.create.assert_has_calls(calls)
 
 
 @patch('bong.framework.db.engine')

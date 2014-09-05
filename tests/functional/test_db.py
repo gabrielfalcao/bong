@@ -12,6 +12,8 @@ from bong.framework.db import (
     EngineNotSpecified,
     InvalidQueryModifier,
     MultipleEnginesSpecified,
+    PrimaryKey,
+    DefaultForeignKey,
 )
 
 metadata = MetaData()
@@ -19,10 +21,9 @@ metadata = MetaData()
 
 class DummyUserModel(Model):
     table = db.Table('dummy_user_model', metadata,
-        db.Column('id', db.Integer, primary_key=True),
-        db.Column('name', db.String(80)),
-        db.Column('age', db.Integer),
-    )
+                     PrimaryKey(),
+                     db.Column('name', db.String(80)),
+                     db.Column('age', db.Integer))
 
 
 def now():
@@ -31,10 +32,10 @@ def now():
 
 class ExquisiteModel(Model):
     table = db.Table('dummy_exquisite', metadata,
-        db.Column('id', db.Integer, primary_key=True),
-        db.Column('score', db.Numeric(), default='10.3'),
-        db.Column('created_at', db.DateTime(), default=now),
-    )
+                     PrimaryKey(),
+                     db.Column('score', db.Numeric(), default='10.3'),
+                     db.Column('created_at', db.DateTime(), default=now),
+                     DefaultForeignKey('user_id', 'dummy_user_model.id'))
 
 
 @specification
@@ -96,7 +97,7 @@ def test_model_to_dict():
 
     j = ExquisiteModel(score=Decimal('2.3'), created_at=datetime(2010, 10, 10))
 
-    j.to_dict().should.equal({'score': '2.30', 'created_at': '2010-10-10T00:00:00', 'id': None})
+    j.to_dict().should.equal({'score': '2.30', 'created_at': '2010-10-10T00:00:00', 'id': None, 'user_id': None})
 
 
 def test_preprocess_should_return_dict():
@@ -232,7 +233,95 @@ def test_find_one_by(context):
     original_user = User.create(**data)
 
     User.find_one_by(id=1).should.be.equal(original_user)
-    User.find_one_by(username='octocat').should.be.equal(original_user)
+    User.find_one_by(username='octocat').refresh().should.be.equal(original_user)
+
+
+@specification
+def test_one_from_query(context):
+    ("Model.one_from_query should take a query and return a model")
+
+    User.create(**{
+        "username": "octocat",
+        "gravatar_id": "somehexcode",
+        "email": "octocat@github.com",
+        "github_token": 'toktok',
+        "github_id": '123',
+    })
+
+    User.create(**{
+        "username": "foobar",
+        "gravatar_id": "foobarsilva",
+        "email": "foobar@github.com",
+        "github_token": 'toktok',
+        "github_id": '321',
+    })
+
+    query = User.table.select().where(User.table.c.username.contains('foobar'))
+    result = User.one_from_query(query)
+    result.should.be.a(User)
+    result.to_dict().should.have.key('username').being.equal('foobar')
+
+
+@specification
+def test_many_from_query(context):
+    ("Model.many_from_query should take a query and return a model")
+
+    User.create(**{
+        "username": "octocat",
+        "gravatar_id": "somehexcode",
+        "email": "octocat@github.com",
+        "github_token": 'toktok',
+        "github_id": '123',
+    })
+
+    User.create(**{
+        "username": "foobar",
+        "gravatar_id": "foobarsilva",
+        "email": "foobar@github.com",
+        "github_token": 'toktok',
+        "github_id": '321',
+    })
+
+    query = User.table.select().where(User.table.c.email.contains('github.com'))
+    results = User.many_from_query(query)
+    results.should.be.a(list)
+    results.should.have.length_of(2)
+    u1, u2 = results
+    u1.username.should.equal('octocat')
+    u2.username.should.equal('foobar')
+
+    User.total_rows(github_token='toktok').should.equal(2)
+
+
+@specification
+def test_query_by__startswith(context):
+    ("Model.query_by__startswith should take a query and return a model")
+
+    User.create(**{
+        "username": "octocat",
+        "gravatar_id": "somehexcode",
+        "email": "user1@github.com",
+        "github_token": 'toktok',
+        "github_id": '123',
+    })
+
+    User.create(**{
+        "username": "foobar",
+        "gravatar_id": "foobarsilva",
+        "email": "user2@github.com",
+        "github_token": 'toktok',
+        "github_id": '321',
+    })
+
+    results = User.find_by(email__startswith='user')
+
+    results.should.be.a(list)
+    results.should.have.length_of(2)
+    u1, u2 = results
+    u1.username.should.equal('foobar')
+    u2.username.should.equal('octocat')
+
+    User.total_rows(github_token='toktok').should.equal(2)
 
 
 @specification
